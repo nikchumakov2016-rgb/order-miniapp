@@ -40,7 +40,7 @@ export async function init(options: {
         if (event.name === 'web_app_request_theme') {
           let tp: ThemeParams = {} as ThemeParams;
           if (firstThemeSent) {
-            tp = themeParams.state() as ThemeParams;
+            tp = themeParams.state() as unknown as ThemeParams;
           } else {
             firstThemeSent = true;
             tp = tp || retrieveLaunchParams().tgWebAppThemeParams as ThemeParams;
