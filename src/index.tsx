@@ -316,7 +316,7 @@ const S = {
 /* ─── App ───────────────────────────────────────────── */
 function App() {
   const API_BASE =
-    (import.meta as any).env?.VITE_API_BASE ?? "http://127.0.0.1:8000";
+    (import.meta as any).env?.VITE_API_BASE ?? "https://rimskie-pelmeni.ru";
 
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [loading, setLoading] = useState(true);
