@@ -415,11 +415,15 @@ function App() {
     };
 
     try {
+      const clientTgUserId = (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user?.id ?? null;
       const resp = await fetch(`${API_BASE}/api/orders`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    ...payload,
+    client_tg_user_id: clientTgUserId,
+  }),
+});
       const data = await resp.json().catch(() => ({}));
 
       if (!resp.ok) {
