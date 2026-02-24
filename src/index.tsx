@@ -439,20 +439,6 @@ if (!clientTgUserId) {
   }
 }
 
-// ВРЕМЕННО для проверки (потом удалим)
-const tgDbg = (window as any)?.Telegram?.WebApp;
-
-alert(
-  [
-    `tg exists: ${!!tgDbg}`,
-    `platform: ${tgDbg?.platform ?? "null"}`,
-    `initData len: ${tgDbg?.initData?.length ?? 0}`,
-    `initDataUnsafe keys: ${tgDbg?.initDataUnsafe ? Object.keys(tgDbg.initDataUnsafe).join(",") : "null"}`,
-    `user in unsafe: ${tgDbg?.initDataUnsafe?.user ? "yes" : "no"}`,
-    `raw user id: ${String(tgDbg?.initDataUnsafe?.user?.id ?? null)}`,
-  ].join("\n")
-);
-
 const resp = await fetch(`${API_BASE}/api/orders`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
