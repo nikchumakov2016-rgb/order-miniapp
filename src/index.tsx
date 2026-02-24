@@ -415,24 +415,34 @@ function App() {
     };
 
     try {
-      const tg = (window as any)?.Telegram?.WebApp;
 
-let clientTgUserId: number | null = tg?.initDataUnsafe?.user?.id ?? null;
+let clientTgUserId: number | null =
+  (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user?.id ?? null;
 
-// fallback: иногда initDataUnsafe пустой, но raw initData есть
-if (!clientTgUserId && tg?.initData) {
+// fallback: пробуем вытащить user.id из initData строкой
+if (!clientTgUserId) {
   try {
-    const params = new URLSearchParams(tg.initData);
-    const userRaw = params.get("user");
-    if (userRaw) {
-      const user = JSON.parse(userRaw);
-      clientTgUserId = user?.id ?? null;
+    const tg = (window as any)?.Telegram?.WebApp;
+
+    if (tg?.initData) {
+      const params = new URLSearchParams(tg.initData);
+      const userRaw = params.get("user");
+
+      if (userRaw) {
+        const user = JSON.parse(userRaw);
+        const parsedId = Number(user?.id);
+        clientTgUserId = Number.isFinite(parsedId) ? parsedId : null;
+      }
     }
   } catch (e) {
     clientTgUserId = null;
   }
 }
-      const resp = await fetch(`${API_BASE}/api/orders`, {
+
+// ВРЕМЕННО для проверки (потом удалим)
+alert(`DEBUG tgid: ${String(clientTgUserId)}`);
+
+const resp = await fetch(`${API_BASE}/api/orders`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
