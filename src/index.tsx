@@ -415,7 +415,23 @@ function App() {
     };
 
     try {
-      const clientTgUserId = (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user?.id ?? null;
+      const tg = (window as any)?.Telegram?.WebApp;
+
+let clientTgUserId: number | null = tg?.initDataUnsafe?.user?.id ?? null;
+
+// fallback: иногда initDataUnsafe пустой, но raw initData есть
+if (!clientTgUserId && tg?.initData) {
+  try {
+    const params = new URLSearchParams(tg.initData);
+    const userRaw = params.get("user");
+    if (userRaw) {
+      const user = JSON.parse(userRaw);
+      clientTgUserId = user?.id ?? null;
+    }
+  } catch (e) {
+    clientTgUserId = null;
+  }
+}
       const resp = await fetch(`${API_BASE}/api/orders`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
