@@ -12,7 +12,7 @@ type CatalogItem = {
   id: string;
   name: string;
   price: number;
-  unit: string;
+  unit: string; in_stock?: boolean;
 };
 type Category = {
   id: string;
@@ -689,4 +689,5 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <App />
   </React.StrictMode>
 );
+
 
