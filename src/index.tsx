@@ -352,6 +352,15 @@ function App() {
         setLoading(false);
       });
   }, [API_BASE]);
+useEffect(() => {
+    const interval = setInterval(() => {
+      fetch(`${API_BASE}/api/catalog`)
+        .then(r => r.json())
+        .then((data: Catalog) => setCatalog(data))
+        .catch(() => {});
+    }, 300000);
+    return () => clearInterval(interval);
+  }, [API_BASE]);
 
   /* ── Cart helpers ── */
   const addToCart = useCallback((item: CatalogItem) => {
