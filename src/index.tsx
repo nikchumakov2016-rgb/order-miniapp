@@ -560,10 +560,12 @@ const resp = await fetch(`${API_BASE}/api/orders`, {
                       +
                     </button>
                   </div>
-                ) : (
-                  <button style={S.addBtn} onClick={() => addToCart(item)}>
-                    + Добавить
-                  </button>
+                ) : item.in_stock === false ? (
+  <div style={{color:'#999', fontSize:'0.85em', padding:'4px 8px'}}>Нет в наличии</div>
+) : (
+<button style={S.addBtn} onClick={() => addToCart(item)}>
+  + Добавить
+</button>
                 )}
               </div>
             );
@@ -687,3 +689,4 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <App />
   </React.StrictMode>
 );
+
