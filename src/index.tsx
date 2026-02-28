@@ -676,8 +676,8 @@ const resp = await fetch(`${API_BASE}/api/orders`, {
 
               <div style={{ ...S.bottomBar, position: "fixed" as const }}>
                 <button
-                  style={S.mainButton(sending || !address.trim() || cartEntries.length === 0)}
-                  disabled={sending || !address.trim() || cartEntries.length === 0}
+                  style={S.mainButton(sending || address.trim().length < 4 || phone.trim().replace(/\D/g,'').length < 10 || cartEntries.length === 0)}
+                  disabled={sending || address.trim().length < 4 || phone.trim().replace(/\D/g,'').length < 10 || cartEntries.length === 0}
                   onClick={submitOrder}
                 >
                   {sending
