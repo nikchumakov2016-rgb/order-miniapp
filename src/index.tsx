@@ -412,7 +412,7 @@ useEffect(() => {
 
     const payload = {
       address: address.trim(),
-      phone: phone.trim(),
+      phone: phone.trim().replace(/^8(\d{10})$/, '+7$1'),
       comment: comment.trim() || undefined,
       total_rub: cartTotal,
       items: cartEntries.map((e) => ({
