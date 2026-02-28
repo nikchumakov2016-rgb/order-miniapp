@@ -329,6 +329,7 @@ function App() {
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [comment, setComment] = useState("");
+const [prefilled, setPrefilled] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [orderSent, setOrderSent] = useState<string | null>(null); // order_id after success
@@ -360,6 +361,20 @@ useEffect(() => {
         .catch(() => {});
     }, 300000);
     return () => clearInterval(interval);
+  }, [API_BASE]);
+useEffect(() => {
+    const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
+    if (!tgUser?.id) return;
+    fetch(`${API_BASE}/api/clients/${tgUser.id}/last`)
+      .then(r => r.json())
+      .then(data => {
+        if (!prefilled && data.address) {
+          setAddress(data.address);
+          setPhone(data.phone);
+          setPrefilled(true);
+        }
+      })
+      .catch(() => {});
   }, [API_BASE]);
 
   /* ── Cart helpers ── */
