@@ -12,7 +12,7 @@ type CatalogItem = {
   id: string;
   name: string;
   price: number;
-  unit: string; in_stock?: boolean;
+  unit: string; in_stock?: boolean; category?: string;
 };
 type Category = {
   id: string;
@@ -431,7 +431,7 @@ useEffect(() => {
       comment: comment.trim() || undefined,
       total_rub: cartTotal,
       items: cartEntries.map((e) => ({
-        name: e.item.name,
+        name: e.item.category ? `${e.item.category}: ${e.item.name}` : e.item.name,
         qty: e.qty,
         price_rub: e.item.price,
         unit: e.item.unit,
@@ -587,7 +587,7 @@ const resp = await fetch(`${API_BASE}/api/orders`, {
                 ) : item.in_stock === false ? (
   <div style={{color:'#999', fontSize:'0.85em', padding:'4px 8px'}}>Нет в наличии</div>
 ) : (
-<button style={S.addBtn} onClick={() => addToCart(item)}>
+<button style={S.addBtn} onClick={() => addToCart({...item, category: cat.name})}>
   + Добавить
 </button>
                 )}
