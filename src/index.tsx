@@ -381,6 +381,8 @@ useEffect(() => {
 
   /* ── Cart helpers ── */
   const addToCart = useCallback((item: CatalogItem) => {
+    const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
+    fetch(`${API_BASE}/api/track/cart_add?tg_user_id=${tgUser?.id || 0}`, { method: 'POST' }).catch(() => {});
     setCart((prev) => {
       const existing = prev[item.id];
       return {
@@ -604,7 +606,11 @@ const resp = await fetch(`${API_BASE}/api/orders`, {
         <div style={S.bottomBar}>
           <button
             style={S.mainButton(false)}
-            onClick={() => setShowCart(true)}
+           onClick={() => {
+              const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
+              fetch(`${API_BASE}/api/track/cart_open?tg_user_id=${tgUser?.id || 0}`, { method: 'POST' }).catch(() => {});
+              setShowCart(true);
+            }}
           >
             Оформить — {cartTotal}₽
           </button>
