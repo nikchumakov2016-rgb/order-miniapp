@@ -339,6 +339,8 @@ const [prefilled, setPrefilled] = useState(false);
     const tg = window.Telegram?.WebApp;
     if (tg) {
       tg.ready();
+const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
+    fetch(`${API_BASE}/api/track/menu_open?tg_user_id=${tgUser?.id || 0}`, { method: 'POST' }).catch(() => {});
       try { tg.expand(); } catch {}
     }
 
