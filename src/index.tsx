@@ -545,13 +545,24 @@ setOrderStatus(status);
                 {deliveryMode === "SCHEDULED" && (
   <>
   <input
-    style={S.input}
+    style={{
+      ...S.input,
+      background: "var(--tg-theme-bg-color, #ffffff)",
+      border: "1.5px solid var(--tg-theme-secondary-bg-color, #dcdcdc)",
+      minHeight: 56,
+    }}
     type="time"
     value={deliveryTime}
     min={`${String(WORK_START_HOUR).padStart(2, "0")}:00`}
     max={`${String(WORK_END_HOUR - 1).padStart(2, "0")}:59`}
     onChange={(e) => setDeliveryTime(e.target.value)}
   />
+
+  {!deliveryTime && (
+    <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 12, lineHeight: 1.45 }}>
+      Нажмите на поле, чтобы выбрать время
+    </div>
+  )}
 
   {deliveryTime && !isValidDeliveryTime(deliveryTime) && (
     <div style={{ fontSize: 13, opacity: 0.75, marginBottom: 12, lineHeight: 1.45 }}>
