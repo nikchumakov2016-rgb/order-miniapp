@@ -193,6 +193,18 @@ function isValidDeliveryTime(value: string): boolean {
   return minutes >= start && minutes < end;
 }
 
+function isFutureDeliveryTimeToday(value: string, date = new Date()): boolean {
+  if (!value) return false;
+
+  const [hh, mm] = value.split(":").map(Number);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return false;
+
+  const selectedMinutes = hh * 60 + mm;
+  const nowMinutes = date.getHours() * 60 + date.getMinutes();
+
+  return selectedMinutes > nowMinutes;
+}
+
 function App() {
   const API_BASE = (import.meta as any).env?.VITE_API_BASE ?? "";
   const [catalog, setCatalog] = useState<Catalog | null>(null);
@@ -212,8 +224,18 @@ function App() {
   const [orderSent, setOrderSent] = useState<string | null>(null);
 const [orderStatus, setOrderStatus] = useState<"NEW" | "PENDING_CONFIRMATION" | null>(null);
   const isWorkingHours = isWorkingHoursNow();
+const isScheduledTimeInFuture =
+  !isWorkingHours ||
+  deliveryMode !== "SCHEDULED" ||
+  !deliveryTime ||
+  isFutureDeliveryTimeToday(deliveryTime);
 const isScheduledTimeValid =
   deliveryMode !== "SCHEDULED" || isValidDeliveryTime(deliveryTime);
+const isScheduledTimeInFuture =
+  !isWorkingHours ||
+  deliveryMode !== "SCHEDULED" ||
+  !deliveryTime ||
+  isFutureDeliveryTimeToday(deliveryTime);
 
   useEffect(() => {
     if (!isWorkingHours && deliveryMode === "ASAP") setDeliveryMode("SCHEDULED");
@@ -525,25 +547,36 @@ setOrderStatus(status);
 
                 {deliveryMode === "SCHEDULED" && (
   <>
-    <input
-  style={S.input}
-  type="time"
-  value={deliveryTime}
-  min={`${String(WORK_START_HOUR).padStart(2, "0")}:00`}
-  max={`${String(WORK_END_HOUR - 1).padStart(2, "0")}:59`}
-  onChange={(e) => setDeliveryTime(e.target.value)}
-/>
-{deliveryTime && !isValidDeliveryTime(deliveryTime) && (
-  <div style={{ fontSize: 13, opacity: 0.75, marginBottom: 12, lineHeight: 1.45 }}>
-    Выберите время доставки с {String(WORK_START_HOUR).padStart(2, "0")}:00 до {String(WORK_END_HOUR).padStart(2, "0")}:00.
-  </div>
-)}
-    {!isWorkingHours && (
+  <input
+    style={S.input}
+    type="time"
+    value={deliveryTime}
+    min={`${String(WORK_START_HOUR).padStart(2, "0")}:00`}
+    max={`${String(WORK_END_HOUR - 1).padStart(2, "0")}:59`}
+    onChange={(e) => setDeliveryTime(e.target.value)}
+  />
+
+  {deliveryTime && !isValidDeliveryTime(deliveryTime) && (
+    <div style={{ fontSize: 13, opacity: 0.75, marginBottom: 12, lineHeight: 1.45 }}>
+      Выберите время доставки с {String(WORK_START_HOUR).padStart(2, "0")}:00 до {String(WORK_END_HOUR).padStart(2, "0")}:00.
+    </div>
+  )}
+
+  {isWorkingHours &&
+    deliveryTime &&
+    isValidDeliveryTime(deliveryTime) &&
+    !isFutureDeliveryTimeToday(deliveryTime) && (
       <div style={{ fontSize: 13, opacity: 0.75, marginBottom: 12, lineHeight: 1.45 }}>
-        Ночью заказ оформляется как заявка. Утром мы проверим наличие и свяжемся с вами для подтверждения.
+        Это время уже прошло сегодня. Выберите более позднее время.
       </div>
     )}
-  </>
+
+  {!isWorkingHours && (
+    <div style={{ fontSize: 13, opacity: 0.75, marginBottom: 12, lineHeight: 1.45 }}>
+      Ночью заказ оформляется как заявка. Утром мы проверим наличие и свяжемся с вами для подтверждения.
+    </div>
+  )}
+</>
 )}
               </div>
 
@@ -557,7 +590,8 @@ setOrderStatus(status);
                     phone.trim().replace(/\D/g, "").length < 10 ||
                     cartEntries.length === 0 ||
                     (!isWorkingHours && deliveryMode === "ASAP") ||
-                    (deliveryMode === "SCHEDULED" && !isScheduledTimeValid)
+                    (deliveryMode === "SCHEDULED" && !isScheduledTimeValid) ||
+(isWorkingHours && deliveryMode === "SCHEDULED" && deliveryTime && !isScheduledTimeInFuture)
                   )}
                   disabled={
                     sending ||
@@ -565,7 +599,8 @@ setOrderStatus(status);
                     phone.trim().replace(/\D/g, "").length < 10 ||
                     cartEntries.length === 0 ||
                     (!isWorkingHours && deliveryMode === "ASAP") ||
-                    (deliveryMode === "SCHEDULED" && !isScheduledTimeValid)
+                    (deliveryMode === "SCHEDULED" && !isScheduledTimeValid) ||
+(isWorkingHours && deliveryMode === "SCHEDULED" && deliveryTime && !isScheduledTimeInFuture)
                   }
                   onClick={submitOrder}
                 >
