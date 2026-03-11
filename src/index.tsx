@@ -223,14 +223,11 @@ function App() {
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [orderSent, setOrderSent] = useState<string | null>(null);
 const [orderStatus, setOrderStatus] = useState<"NEW" | "PENDING_CONFIRMATION" | null>(null);
-  const isWorkingHours = isWorkingHoursNow();
-const isScheduledTimeInFuture =
-  !isWorkingHours ||
-  deliveryMode !== "SCHEDULED" ||
-  !deliveryTime ||
-  isFutureDeliveryTimeToday(deliveryTime);
+const isWorkingHours = isWorkingHoursNow();
+
 const isScheduledTimeValid =
   deliveryMode !== "SCHEDULED" || isValidDeliveryTime(deliveryTime);
+
 const isScheduledTimeInFuture =
   !isWorkingHours ||
   deliveryMode !== "SCHEDULED" ||
