@@ -180,6 +180,19 @@ function isWorkingHoursNow(date = new Date()): boolean {
   return h >= WORK_START_HOUR && h < WORK_END_HOUR;
 }
 
+function isValidDeliveryTime(value: string): boolean {
+  if (!value) return false;
+
+  const [hh, mm] = value.split(":").map(Number);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return false;
+
+  const minutes = hh * 60 + mm;
+  const start = WORK_START_HOUR * 60;
+  const end = WORK_END_HOUR * 60;
+
+  return minutes >= start && minutes < end;
+}
+
 function App() {
   const API_BASE = (import.meta as any).env?.VITE_API_BASE ?? "";
   const [catalog, setCatalog] = useState<Catalog | null>(null);
@@ -199,6 +212,8 @@ function App() {
   const [orderSent, setOrderSent] = useState<string | null>(null);
 const [orderStatus, setOrderStatus] = useState<"NEW" | "PENDING_CONFIRMATION" | null>(null);
   const isWorkingHours = isWorkingHoursNow();
+const isScheduledTimeValid =
+  deliveryMode !== "SCHEDULED" || isValidDeliveryTime(deliveryTime);
 
   useEffect(() => {
     if (!isWorkingHours && deliveryMode === "ASAP") setDeliveryMode("SCHEDULED");
@@ -509,15 +524,27 @@ setOrderStatus(status);
                 )}
 
                 {deliveryMode === "SCHEDULED" && (
-                  <>
-                    <input style={S.input} type="time" value={deliveryTime} onChange={(e) => setDeliveryTime(e.target.value)} />
-                    <div style={{ fontSize: 13, opacity: 0.75, marginBottom: 12, lineHeight: 1.45 }}>
-                      {isWorkingHours
-                        ? "После оформления мы свяжемся с вами для подтверждения."
-                        : "Ночью заказ оформляется как заявка. Утром мы проверим наличие и свяжемся с вами для подтверждения."}
-                    </div>
-                  </>
-                )}
+  <>
+    <input
+  style={S.input}
+  type="time"
+  value={deliveryTime}
+  min={`${String(WORK_START_HOUR).padStart(2, "0")}:00`}
+  max={`${String(WORK_END_HOUR - 1).padStart(2, "0")}:59`}
+  onChange={(e) => setDeliveryTime(e.target.value)}
+/>
+{deliveryTime && !isValidDeliveryTime(deliveryTime) && (
+  <div style={{ fontSize: 13, opacity: 0.75, marginBottom: 12, lineHeight: 1.45 }}>
+    Выберите время доставки с {String(WORK_START_HOUR).padStart(2, "0")}:00 до {String(WORK_END_HOUR).padStart(2, "0")}:00.
+  </div>
+)}
+    {!isWorkingHours && (
+      <div style={{ fontSize: 13, opacity: 0.75, marginBottom: 12, lineHeight: 1.45 }}>
+        Ночью заказ оформляется как заявка. Утром мы проверим наличие и свяжемся с вами для подтверждения.
+      </div>
+    )}
+  </>
+)}
               </div>
 
               {result && <div style={S.resultBox(result.ok)}>{result.text}</div>}
@@ -530,7 +557,7 @@ setOrderStatus(status);
                     phone.trim().replace(/\D/g, "").length < 10 ||
                     cartEntries.length === 0 ||
                     (!isWorkingHours && deliveryMode === "ASAP") ||
-                    (deliveryMode === "SCHEDULED" && !deliveryTime)
+                    (deliveryMode === "SCHEDULED" && !isScheduledTimeValid)
                   )}
                   disabled={
                     sending ||
@@ -538,7 +565,7 @@ setOrderStatus(status);
                     phone.trim().replace(/\D/g, "").length < 10 ||
                     cartEntries.length === 0 ||
                     (!isWorkingHours && deliveryMode === "ASAP") ||
-                    (deliveryMode === "SCHEDULED" && !deliveryTime)
+                    (deliveryMode === "SCHEDULED" && !isScheduledTimeValid)
                   }
                   onClick={submitOrder}
                 >
