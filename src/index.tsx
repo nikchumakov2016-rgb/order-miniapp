@@ -13,6 +13,7 @@ type CatalogItem = {
   price: number;
   unit: string;
   in_stock?: boolean;
+  image?: string;
   category?: string;
 };
 type Category = {
@@ -102,6 +103,7 @@ const S = {
     marginBottom: 8,
     borderRadius: 14,
     background: tgVar("secondary-bg-color", "#f7f7f8"),
+    gap: 10,
     transition: "transform .15s",
   } as React.CSSProperties,
   cardLeft: { flex: 1 } as React.CSSProperties,
@@ -550,6 +552,7 @@ window.history.replaceState(null, '', _u.toString());
             const inCart = cart[item.id];
             return (
               <div key={item.id} style={S.card}>
+                {item.image && <img src={item.image} alt={item.name} style={{ width: 64, height: 64, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />}
                 <div style={S.cardLeft}>
                   <div style={S.cardName}>{item.name}</div>
                   <div style={S.cardPrice}>{item.price}{currency} / {item.unit}</div>
