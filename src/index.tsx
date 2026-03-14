@@ -24,12 +24,15 @@ type Category = {
 type Catalog = {
   shop_name: string;
   currency: string;
+  work_start_hour?: number;
+  work_end_hour?: number;
+  free_delivery_from?: number;
+  phone?: string;
+  order_confirmation_text?: string;
   categories: Category[];
 };
 type CartEntry = { item: CatalogItem; qty: number };
 
-const WORK_START_HOUR = 10;
-const WORK_END_HOUR = 22;
 
 function tgVar(name: string, fallback: string): string {
   return `var(--tg-theme-${name}, ${fallback})`;
@@ -175,20 +178,20 @@ const S = {
   } as React.CSSProperties,
 };
 
-function isWorkingHoursNow(date = new Date()): boolean {
+function isWorkingHoursNow(date = new Date(), startHour = 10, endHour = 22): boolean {
   const h = date.getHours();
-  return h >= WORK_START_HOUR && h < WORK_END_HOUR;
+  return h >= startHour && h < endHour;
 }
 
-function isValidDeliveryTime(value: string): boolean {
+function isValidDeliveryTime(value: string, startHour = 10, endHour = 22): boolean {
   if (!value) return false;
 
   const [hh, mm] = value.split(":").map(Number);
   if (!Number.isFinite(hh) || !Number.isFinite(mm)) return false;
 
   const minutes = hh * 60 + mm;
-  const start = WORK_START_HOUR * 60;
-  const end = WORK_END_HOUR * 60;
+  const start = startHour * 60;
+  const end = endHour * 60;
 
   return minutes >= start && minutes < end;
 }
@@ -223,10 +226,18 @@ function App() {
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [orderSent, setOrderSent] = useState<string | null>(null);
 const [orderStatus, setOrderStatus] = useState<"NEW" | "PENDING_CONFIRMATION" | null>(null);
-const isWorkingHours = isWorkingHoursNow();
+const workStart = catalog?.work_start_hour ?? 10;
+const workEnd = catalog?.work_end_hour ?? 22;
+const currency = catalog?.currency ?? "₽";
+const freeFrom = catalog?.free_delivery_from ?? 0;
+const bizPhone = catalog?.phone ?? "";
+const confirmText = catalog?.order_confirmation_text
+  ?? "Мы получили ваш заказ и скоро перезвоним для подтверждения.";
+
+const isWorkingHours = isWorkingHoursNow(undefined, workStart, workEnd);
 
 const isScheduledTimeValid =
-  deliveryMode !== "SCHEDULED" || isValidDeliveryTime(deliveryTime);
+  deliveryMode !== "SCHEDULED" || isValidDeliveryTime(deliveryTime, workStart, workEnd);
 
 const isScheduledTimeInFuture =
   !isWorkingHours ||
@@ -248,7 +259,7 @@ const isScheduledTimeInFuture =
     }
     fetch(`${API_BASE}/api/catalog`)
       .then((r) => r.json())
-      .then((data: Catalog) => { setCatalog(data); setLoading(false); })
+      .then((data: Catalog) => { setCatalog(data); document.title = data.shop_name; setLoading(false); })
       .catch((e) => { setError(`Не удалось загрузить каталог: ${e.message}`); setLoading(false); });
   }, [API_BASE]);
 
@@ -403,6 +414,11 @@ setOrderStatus(status);
       <div style={{ fontSize: 16, opacity: 0.6, marginBottom: 4 }}>
         Номер заказа: #{orderSent}
       </div>
+      {bizPhone && (
+        <div style={{ fontSize: 14, opacity: 0.5, marginBottom: 24 }}>
+          Вопросы по заказу: {bizPhone}
+        </div>
+      )}
 
       <div
         style={{
@@ -415,7 +431,7 @@ setOrderStatus(status);
       >
         {isNightRequest
           ? "Утром мы проверим наличие и свяжемся с вами для подтверждения."
-          : "Мы получили ваш заказ и скоро перезвоним для подтверждения."}
+          : confirmText}
       </div>
 
       <button
@@ -452,7 +468,7 @@ setOrderStatus(status);
               <div key={item.id} style={S.card}>
                 <div style={S.cardLeft}>
                   <div style={S.cardName}>{item.name}</div>
-                  <div style={S.cardPrice}>{item.price}₽ / {item.unit}</div>
+                  <div style={S.cardPrice}>{item.price}{currency} / {item.unit}</div>
                 </div>
                 {inCart ? (
                   <div style={S.qtyControls}>
@@ -477,7 +493,7 @@ setOrderStatus(status);
             const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
             fetch(`${API_BASE}/api/track/cart_open?tg_user_id=${tgUser?.id || 0}`, { method: "POST" }).catch(() => {});
             setShowCart(true);
-          }}>Оформить — {cartTotal}₽</button>
+          }}>Оформить — {cartTotal}{currency}</button>
           <button style={S.cartButton} onClick={() => setShowCart(true)}>🛒<span style={S.badge}>{cartCount}</span></button>
         </div>
       )}
@@ -497,7 +513,7 @@ setOrderStatus(status);
                 <div key={entry.item.id} style={S.card}>
                   <div style={S.cardLeft}>
                     <div style={S.cardName}>{entry.item.name}</div>
-                    <div style={S.cardPrice}>{entry.item.price}₽ × {entry.qty} = {entry.item.price * entry.qty}₽</div>
+                    <div style={S.cardPrice}>{entry.item.price}{currency} × {entry.qty} = {entry.item.price * entry.qty}{currency}</div>
                   </div>
                   <div style={S.qtyControls}>
                     <button style={S.qtyBtn} onClick={() => changeQty(entry.item.id, -1)}>−</button>
@@ -507,7 +523,12 @@ setOrderStatus(status);
                 </div>
               ))}
 
-              <div style={S.totalLine}><span>Итого</span><span>{cartTotal}₽</span></div>
+              {freeFrom > 0 && cartTotal < freeFrom && (
+                <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 8 }}>
+                  Бесплатная доставка от {freeFrom}{currency}
+                </div>
+              )}
+              <div style={S.totalLine}><span>Итого</span><span>{cartTotal}{currency}</span></div>
 
               <div style={{ marginTop: 20 }}>
                 <label style={S.label}>Телефон для связи</label>
@@ -538,7 +559,7 @@ setOrderStatus(status);
 
                 {!isWorkingHours && (
                   <div style={{ fontSize: 13, opacity: 0.75, marginBottom: 12, lineHeight: 1.45 }}>
-                    Заказы на сейчас принимаем с {String(WORK_START_HOUR).padStart(2, "0")}:00. Выберите время доставки.
+                    Заказы на сейчас принимаем с {String(workStart).padStart(2, "0")}:00. Выберите время доставки.
                   </div>
                 )}
 
@@ -553,8 +574,8 @@ setOrderStatus(status);
     }}
     type="time"
     value={deliveryTime}
-    min={`${String(WORK_START_HOUR).padStart(2, "0")}:00`}
-    max={`${String(WORK_END_HOUR - 1).padStart(2, "0")}:59`}
+    min={`${String(workStart).padStart(2, "0")}:00`}
+    max={`${String(workEnd - 1).padStart(2, "0")}:59`}
     onChange={(e) => setDeliveryTime(e.target.value)}
   />
 
@@ -566,7 +587,7 @@ setOrderStatus(status);
 
   {deliveryTime && !isValidDeliveryTime(deliveryTime) && (
     <div style={{ fontSize: 13, opacity: 0.75, marginBottom: 12, lineHeight: 1.45 }}>
-      Выберите время доставки с {String(WORK_START_HOUR).padStart(2, "0")}:00 до {String(WORK_END_HOUR).padStart(2, "0")}:00.
+      Выберите время доставки с {String(workStart).padStart(2, "0")}:00 до {String(workEnd).padStart(2, "0")}:00.
     </div>
   )}
 
@@ -612,7 +633,7 @@ setOrderStatus(status);
                   }
                   onClick={submitOrder}
                 >
-                  {sending ? "Отправляю..." : `Заказать — ${cartTotal}₽`}
+                  {sending ? "Отправляю..." : `Заказать — ${cartTotal}${currency}`}
                 </button>
               </div>
             </>
