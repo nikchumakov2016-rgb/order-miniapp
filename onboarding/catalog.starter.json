@@ -1,0 +1,49 @@
+{
+  "shop_name": "Название магазина",
+  "currency": "₽",
+  "phone": "79001234567",
+  "address": "Город, улица, дом",
+  "free_delivery_from": 1000,
+  "work_start_hour": 10,
+  "work_end_hour": 22,
+  "timezone_offset": 3,
+  "order_confirmation_text": "Мы получили ваш заказ и скоро перезвоним для подтверждения.",
+  "categories": [
+    {
+      "id": "category1",
+      "name": "Категория 1",
+      "emoji": "🍽️",
+      "items": [
+        {
+          "id": "c1_item1",
+          "name": "Название товара",
+          "price": 500,
+          "unit": "кг",
+          "in_stock": true,
+          "image": "https://example.com/images/item1.jpg"
+        },
+        {
+          "id": "c1_item2",
+          "name": "Название товара 2",
+          "price": 350,
+          "unit": "шт",
+          "in_stock": true
+        }
+      ]
+    },
+    {
+      "id": "category2",
+      "name": "Категория 2",
+      "emoji": "🥩",
+      "items": [
+        {
+          "id": "c2_item1",
+          "name": "Название товара",
+          "price": 600,
+          "unit": "кг",
+          "in_stock": false
+        }
+      ]
+    }
+  ]
+}
