@@ -208,6 +208,17 @@ function isFutureDeliveryTimeToday(value: string, date = new Date()): boolean {
   return selectedMinutes > nowMinutes;
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  NEW:                  "Получен",
+  PENDING_CONFIRMATION: "Ожидает подтверждения",
+  ACCEPTED:             "Принят",
+  COOKING:              "Готовится",
+  ONWAY:                "Выехал курьер",
+  DONE:                 "Доставлен",
+  REJECTED:             "Отклонён",
+  NOT_FOUND:            "Заказ не найден",
+};
+
 function App() {
   const API_BASE = (import.meta as any).env?.VITE_API_BASE ?? "";
   const [catalog, setCatalog] = useState<Catalog | null>(null);
@@ -224,8 +235,11 @@ function App() {
   const [prefilled, setPrefilled] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
-  const [orderSent, setOrderSent] = useState<string | null>(null);
+  const [orderSent, setOrderSent] = useState<string | null>(
+    () => new URLSearchParams(window.location.search).get('order')
+  );
 const [orderStatus, setOrderStatus] = useState<"NEW" | "PENDING_CONFIRMATION" | null>(null);
+const [liveStatus, setLiveStatus] = useState<string | null>(null);
 const workStart = catalog?.work_start_hour ?? 10;
 const workEnd = catalog?.work_end_hour ?? 22;
 const currency = catalog?.currency ?? "₽";
@@ -283,6 +297,27 @@ const isScheduledTimeInFuture =
         }
       }).catch(() => {});
   }, [API_BASE, prefilled]);
+
+  useEffect(() => {
+    if (!orderSent) return;
+    const TERMINAL = new Set(["DONE", "REJECTED"]);
+    let intervalId: ReturnType<typeof setInterval>;
+    const poll = () => {
+      fetch(`${API_BASE}/api/orders/${orderSent}`)
+        .then(r => { if (!r.ok) throw r.status; return r.json(); })
+        .then(data => {
+          if (!data?.status) return;
+          setLiveStatus(data.status);
+          if (TERMINAL.has(data.status)) clearInterval(intervalId);
+        })
+        .catch(err => {
+          if (err === 404) { setLiveStatus('NOT_FOUND'); clearInterval(intervalId); }
+        });
+    };
+    poll();
+    intervalId = setInterval(poll, 12000);
+    return () => clearInterval(intervalId);
+  }, [orderSent, API_BASE]);
 
   const addToCart = useCallback((item: CatalogItem) => {
     const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
@@ -366,6 +401,10 @@ const isScheduledTimeInFuture =
 const status = (data.status ?? "NEW") as "NEW" | "PENDING_CONFIRMATION";
 setOrderSent(oid);
 setOrderStatus(status);
+setLiveStatus(status);
+const _u = new URL(window.location.href);
+_u.searchParams.set('order', oid);
+window.history.replaceState(null, '', _u.toString());
         setCart({});
         setShowCart(false);
         setAddress("");
@@ -414,6 +453,11 @@ setOrderStatus(status);
       <div style={{ fontSize: 16, opacity: 0.6, marginBottom: 4 }}>
         Номер заказа: #{orderSent}
       </div>
+      {liveStatus && (
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
+          Статус: {STATUS_LABELS[liveStatus] ?? liveStatus}
+        </div>
+      )}
       {bizPhone && (
         <div style={{ fontSize: 14, opacity: 0.5, marginBottom: 24 }}>
           Вопросы по заказу: {bizPhone}
@@ -439,6 +483,10 @@ setOrderStatus(status);
         onClick={() => {
           setOrderSent(null);
           setOrderStatus(null);
+          setLiveStatus(null);
+          const _u = new URL(window.location.href);
+          _u.searchParams.delete('order');
+          window.history.replaceState(null, '', _u.toString());
         }}
       >
         Вернуться в меню
