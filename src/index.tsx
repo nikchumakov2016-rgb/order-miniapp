@@ -299,6 +299,21 @@ const isScheduledTimeInFuture =
       }).catch(() => {});
   }, [API_BASE, prefilled]);
 
+  function applyLocalContact() {
+    try {
+      const saved = localStorage.getItem('order_contact');
+      if (!saved) return;
+      const { phone: p, address: a } = JSON.parse(saved);
+      if (a) setAddress(a);
+      if (p) setPhone(p);
+    } catch {}
+  }
+
+  useEffect(() => {
+    const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
+    if (!tgUser?.id) applyLocalContact();
+  }, []);
+
   useEffect(() => {
     if (!orderSent) return;
     const TERMINAL = new Set(["DONE", "REJECTED"]);
@@ -406,6 +421,9 @@ setLiveStatus(status);
 const _u = new URL(window.location.href);
 _u.searchParams.set('order', oid);
 window.history.replaceState(null, '', _u.toString());
+        try {
+          localStorage.setItem('order_contact', JSON.stringify({ phone: normalizedPhone, address: address.trim() }));
+        } catch {}
         setCart({});
         setShowCart(false);
         setAddress("");
@@ -500,6 +518,8 @@ window.history.replaceState(null, '', _u.toString());
           setOrderStatus(null);
           setLiveStatus(null);
           setCopied(null);
+          if ((window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id) setPrefilled(false);
+          else applyLocalContact();
           const _u = new URL(window.location.href);
           _u.searchParams.delete('order');
           window.history.replaceState(null, '', _u.toString());
