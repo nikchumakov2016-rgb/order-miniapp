@@ -26,6 +26,25 @@
   <div id="orders"></div>
 
   <script>
+    let refreshInterval = null;
+    let lastKnownId = null;
+    let audioCtx = null;
+
+    function beep() {
+      if (!audioCtx) return;
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
+      } catch(e) {}
+    }
+
     const LABELS = {
       ACCEPTED: '✅ Принят',
       REJECTED:  '❌ Отклонён',
@@ -57,12 +76,19 @@
     async function load() {
       clearError();
       localStorage.setItem('apiBase', base());
+      if (!audioCtx) { try { audioCtx = new AudioContext(); } catch(e) {} }
       const r = await fetch(`${base()}/api/orders`, {
         headers: { 'X-Admin-Token': tok() },
       }).catch(e => { showError(`Сеть: ${e.message}`); return null; });
-      if (!r) return;
-      if (!r.ok) { showError(await parseError(r)); return; }
-      render(await r.json());
+      if (!r) { clearInterval(refreshInterval); refreshInterval = null; return; }
+      if (!r.ok) { showError(await parseError(r)); clearInterval(refreshInterval); refreshInterval = null; return; }
+      const orders = await r.json();
+      const newId = orders[0]?.id ?? null;
+      if (lastKnownId !== null && newId !== null && newId !== lastKnownId) beep();
+      lastKnownId = newId ?? lastKnownId;
+      render(orders);
+      clearInterval(refreshInterval);
+      refreshInterval = setInterval(load, 15000);
     }
 
     function render(orders) {

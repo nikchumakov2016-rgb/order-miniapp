@@ -240,6 +240,7 @@ function App() {
   );
 const [orderStatus, setOrderStatus] = useState<"NEW" | "PENDING_CONFIRMATION" | null>(null);
 const [liveStatus, setLiveStatus] = useState<string | null>(null);
+const [copied, setCopied] = useState<string | null>(null);
 const workStart = catalog?.work_start_hour ?? 10;
 const workEnd = catalog?.work_end_hour ?? 22;
 const currency = catalog?.currency ?? "₽";
@@ -478,12 +479,27 @@ window.history.replaceState(null, '', _u.toString());
           : confirmText}
       </div>
 
+      <div style={{ fontSize: 13, opacity: 0.5, marginBottom: 10 }}>
+        Сохраните ссылку, чтобы открыть статус заказа позже
+      </div>
+      <button
+        style={{ ...S.mainButton(false), padding: "10px 24px", flex: "none" as any, marginBottom: 16, fontSize: 14 }}
+        onClick={() => {
+          navigator.clipboard.writeText(window.location.href)
+            .then(() => { setCopied('ok'); setTimeout(() => setCopied(null), 2500); })
+            .catch(() => { setCopied('fail'); setTimeout(() => setCopied(null), 2500); });
+        }}
+      >
+        {copied === 'ok' ? "Ссылка скопирована ✓" : copied === 'fail' ? "Не удалось скопировать" : "Скопировать ссылку"}
+      </button>
+
       <button
         style={{ ...S.mainButton(false), padding: "14px 32px", flex: "none" as any }}
         onClick={() => {
           setOrderSent(null);
           setOrderStatus(null);
           setLiveStatus(null);
+          setCopied(null);
           const _u = new URL(window.location.href);
           _u.searchParams.delete('order');
           window.history.replaceState(null, '', _u.toString());
