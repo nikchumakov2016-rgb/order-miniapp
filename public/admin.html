@@ -14,12 +14,16 @@
     button { padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer;
              background: #3390ec; color: #fff; font-size: 13px; }
     .error { color: #c0392b; margin: 8px 0; font-size: 14px; }
+    .toggle { background: #eee; color: #555; white-space: nowrap; flex-shrink: 0; }
   </style>
 </head>
 <body>
   <div class="cfg">
     <input id="apiBase" placeholder="http://127.0.0.1:8000">
-    <input id="token" type="password" placeholder="Admin Token">
+    <div style="display:flex;flex:1;gap:4px;min-width:150px;">
+      <input id="token" type="password" placeholder="Admin Token" style="min-width:0;">
+      <button id="toggleBtn" class="toggle" onclick="toggleToken()">показать</button>
+    </div>
     <button onclick="load()">Загрузить</button>
   </div>
   <div id="error" class="error"></div>
@@ -56,6 +60,25 @@
     function base() { return document.getElementById('apiBase').value.replace(/\/$/, ''); }
     function tok()  { return document.getElementById('token').value; }
     function showError(msg) { document.getElementById('error').textContent = msg; }
+
+    function sanitizeToken(raw) {
+      let s = raw.trim().replace(/[\u00A0\u200B-\u200D\uFEFF]/g, '');
+      for (let i = 0; i < s.length; i++) {
+        const code = s.charCodeAt(i);
+        if (code < 0x20 || code > 0x7E) {
+          const hex = code.toString(16).toUpperCase().padStart(4, '0');
+          return { value: null, error: `Токен содержит недопустимый символ "${s[i]}" (U+${hex}) на позиции ${i + 1}` };
+        }
+      }
+      return { value: s, error: null };
+    }
+
+    function toggleToken() {
+      const el = document.getElementById('token');
+      const btn = document.getElementById('toggleBtn');
+      if (el.type === 'password') { el.type = 'text'; btn.textContent = 'скрыть'; }
+      else { el.type = 'password'; btn.textContent = 'показать'; }
+    }
     function clearError()   { document.getElementById('error').textContent = ''; }
 
     window.onload = () => {
@@ -65,10 +88,13 @@
     };
 
     async function parseError(r) {
+      if (r.status === 403) return 'Неверный токен. Проверьте Admin Token.';
       try {
         const j = await r.json();
-        return `Ошибка ${r.status}${j.detail ? ': ' + j.detail : ''}`;
+        if (r.status >= 500) return `Ошибка сервера${j.detail ? ': ' + j.detail : '. Попробуйте позже.'}`;
+        return j.detail || `Ошибка ${r.status}`;
       } catch {
+        if (r.status >= 500) return 'Ошибка сервера. Попробуйте позже.';
         return `Ошибка ${r.status}`;
       }
     }
@@ -77,9 +103,11 @@
       clearError();
       localStorage.setItem('apiBase', base());
       if (!audioCtx) { try { audioCtx = new AudioContext(); } catch(e) {} }
+      const { value: token, error: tokenError } = sanitizeToken(tok());
+      if (tokenError) { showError(tokenError); return; }
       const r = await fetch(`${base()}/api/orders`, {
-        headers: { 'X-Admin-Token': tok() },
-      }).catch(e => { showError(`Сеть: ${e.message}`); return null; });
+        headers: { 'X-Admin-Token': token },
+      }).catch(() => { showError('Не удалось подключиться. Проверьте адрес сервера.'); return null; });
       if (!r) { clearInterval(refreshInterval); refreshInterval = null; return; }
       if (!r.ok) { showError(await parseError(r)); clearInterval(refreshInterval); refreshInterval = null; return; }
       const orders = await r.json();
@@ -110,10 +138,12 @@
 
     async function setStatus(id, status) {
       clearError();
+      const { value: token, error: tokenError } = sanitizeToken(tok());
+      if (tokenError) { showError(tokenError); return; }
       const r = await fetch(`${base()}/api/orders/${id}/status?status=${status}`, {
         method: 'POST',
-        headers: { 'X-Admin-Token': tok() },
-      }).catch(e => { showError(`Сеть: ${e.message}`); return null; });
+        headers: { 'X-Admin-Token': token },
+      }).catch(() => { showError('Не удалось подключиться. Проверьте адрес сервера.'); return null; });
       if (!r) return;
       if (!r.ok) { showError(await parseError(r)); return; }
       load(); // reload only on success
