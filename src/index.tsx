@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 
 declare global {
@@ -237,6 +237,7 @@ function App() {
   const [prefilled, setPrefilled] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
   const [orderSent, setOrderSent] = useState<string | null>(
     () => new URLSearchParams(window.location.search).get('order')
   );
@@ -281,10 +282,19 @@ const isScheduledTimeInFuture =
   }, [API_BASE]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetch(`${API_BASE}/api/catalog`).then((r) => r.json()).then((data: Catalog) => setCatalog(data)).catch(() => {});
-    }, 300000);
-    return () => clearInterval(interval);
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') return;
+      fetch(`${API_BASE}/api/catalog`, { cache: 'no-store' }).then(r => r.json()).then((data: Catalog) => setCatalog(data)).catch(() => {});
+    };
+    refresh();
+    const interval = setInterval(refresh, 12000);
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('focus', refresh);
+    };
   }, [API_BASE]);
 
   useEffect(() => {
@@ -337,6 +347,16 @@ const isScheduledTimeInFuture =
     return () => clearInterval(intervalId);
   }, [orderSent, API_BASE]);
 
+  useEffect(() => {
+    if (result && !result.ok) {
+      resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [result]);
+
+  useEffect(() => {
+    setResult(prev => (prev && !prev.ok ? null : prev));
+  }, [cart]);
+
   const addToCart = useCallback((item: CatalogItem) => {
     const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
     fetch(`${API_BASE}/api/track/cart_add?tg_user_id=${tgUser?.id || 0}`, { method: "POST" }).catch(() => {});
@@ -379,6 +399,7 @@ const isScheduledTimeInFuture =
       delivery_mode: deliveryMode,
       scheduled_for: deliveryMode === "SCHEDULED" && deliveryTime ? deliveryTime : null,
       items: cartEntries.map((e) => ({
+        id: e.item.id,
         name: e.item.category ? `${e.item.category}: ${e.item.name}` : e.item.name,
         qty: e.qty,
         price_rub: e.item.price,
@@ -696,7 +717,7 @@ window.history.replaceState(null, '', _u.toString());
 )}
               </div>
 
-              {result && <div style={S.resultBox(result.ok)}>{result.text}</div>}
+              {result && <div ref={resultRef} style={S.resultBox(result.ok)}>{result.text}</div>}
 
               <div style={{ ...S.bottomBar, position: "fixed" as const }}>
                 <button
@@ -720,7 +741,7 @@ window.history.replaceState(null, '', _u.toString());
                   }
                   onClick={submitOrder}
                 >
-                  {sending ? "Отправляю..." : `Заказать — ${cartTotal}${currency}`}
+                  {sending ? "Проверяем..." : `Заказать — ${cartTotal}${currency}`}
                 </button>
               </div>
             </>
