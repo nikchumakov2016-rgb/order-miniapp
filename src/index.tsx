@@ -223,6 +223,18 @@ const STATUS_LABELS: Record<string, string> = {
 
 function App() {
   const API_BASE = (import.meta as any).env?.VITE_API_BASE ?? "";
+  const [isTest] = useState(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('test') === '1') {
+      sessionStorage.setItem('is_test', '1');
+      p.delete('test');
+      const qs = p.toString();
+      const clean = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+      window.history.replaceState(null, '', clean);
+    }
+    return sessionStorage.getItem('is_test') === '1';
+  });
+  const testQ = isTest ? '&is_test=true' : '';
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -272,7 +284,7 @@ const isScheduledTimeInFuture =
     if (tg) {
       tg.ready();
       const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
-      fetch(`${API_BASE}/api/track/menu_open?tg_user_id=${tgUser?.id || 0}`, { method: "POST" }).catch(() => {});
+      fetch(`${API_BASE}/api/track/menu_open?tg_user_id=${tgUser?.id || 0}${testQ}`, { method: "POST" }).catch(() => {});
       try { tg.expand(); } catch {}
     }
     fetch(`${API_BASE}/api/catalog`)
@@ -359,7 +371,7 @@ const isScheduledTimeInFuture =
 
   const addToCart = useCallback((item: CatalogItem) => {
     const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
-    fetch(`${API_BASE}/api/track/cart_add?tg_user_id=${tgUser?.id || 0}`, { method: "POST" }).catch(() => {});
+    fetch(`${API_BASE}/api/track/cart_add?tg_user_id=${tgUser?.id || 0}${testQ}`, { method: "POST" }).catch(() => {});
     setCart((prev) => {
       const existing = prev[item.id];
       return { ...prev, [item.id]: { item, qty: existing ? existing.qty + 1 : 1 } };
@@ -429,7 +441,7 @@ const isScheduledTimeInFuture =
       const resp = await fetch(`${API_BASE}/api/orders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, client_tg_user_id: clientTgUserId }),
+        body: JSON.stringify({ ...payload, client_tg_user_id: clientTgUserId, is_test: isTest }),
       });
 
       const data = await resp.json().catch(() => ({}));
@@ -556,6 +568,7 @@ window.history.replaceState(null, '', _u.toString());
 
   return (
     <div style={S.app}>
+      {isTest && <div style={{position:'fixed',top:0,left:0,right:0,zIndex:9999,background:'#ff3b30',color:'#fff',fontSize:11,fontWeight:700,textAlign:'center' as const,padding:'3px 0',letterSpacing:'1px'}}>ТЕСТОВЫЙ РЕЖИМ</div>}
       <div style={S.header}>
         <h1 style={S.shopName}>{catalog.shop_name}</h1>
         <div style={S.tabs}>
@@ -599,7 +612,7 @@ window.history.replaceState(null, '', _u.toString());
         <div style={S.bottomBar}>
           <button style={S.mainButton(false)} onClick={() => {
             const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
-            fetch(`${API_BASE}/api/track/cart_open?tg_user_id=${tgUser?.id || 0}`, { method: "POST" }).catch(() => {});
+            fetch(`${API_BASE}/api/track/cart_open?tg_user_id=${tgUser?.id || 0}${testQ}`, { method: "POST" }).catch(() => {});
             setShowCart(true);
           }}>Оформить — {cartTotal}{currency}</button>
           <button style={S.cartButton} onClick={() => setShowCart(true)}>🛒<span style={S.badge}>{cartCount}</span></button>
