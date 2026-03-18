@@ -136,6 +136,9 @@
           </div>
           <div>${o.address ?? ''} · ${o.phone ?? ''}</div>
           ${o.comment ? `<div style="font-size:13px;opacity:.7">${o.comment}</div>` : ''}
+          ${(o.items || []).length ? `<div style="font-size:13px;margin-top:4px">Состав:<br>${o.items.map(i =>
+            `• ${i.name} — ${i.qty} ${i.unit || 'шт'} × ${Math.round(i.price_rub)}₽`
+          ).join('<br>')}</div>` : ''}
           <div class="btns">
             ${Object.entries(LABELS).map(([s, l]) =>
               `<button onclick="setStatus('${o.id}','${s}')">${l}</button>`
