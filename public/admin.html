@@ -27,6 +27,7 @@
     <button onclick="load()">Загрузить</button>
   </div>
   <div id="error" class="error"></div>
+  <div id="stats"></div>
   <div id="stock"></div>
   <div id="stock-error" class="error"></div>
   <div id="orders"></div>
@@ -124,6 +125,10 @@
         .then(rc => rc.ok ? rc.json() : null)
         .then(catalog => { if (catalog) { clearStockError(); renderStock(catalog.categories || []); } })
         .catch(() => {});
+      fetch(`${base()}/api/admin/stats`, { headers: { 'X-Admin-Token': token }, cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .then(stats => { if (stats) renderStats(stats); })
+        .catch(() => {});
       clearInterval(refreshInterval);
       refreshInterval = setInterval(load, 15000);
     }
@@ -146,6 +151,20 @@
           </div>
         </div>
       `).join('') || '<div style="opacity:.5">Заказов нет</div>';
+    }
+
+    function fmtDate(iso) { const p = iso.split('-'); return `${p[2]}.${p[1]}.${p[0].slice(2)}`; }
+
+    function renderStats(s) {
+      const row = (d) =>
+        `<span>📋 Меню: ${d.menu_opens}</span> · <span>➕ В корзину: ${d.cart_adds}</span> · <span>🛒 Корзина: ${d.cart_opens}</span> · <span>✅ Заказы: ${d.orders}</span>`;
+      document.getElementById('stats').innerHTML = `
+        <h3 style="margin:16px 0 8px;font-size:15px">Статистика</h3>
+        <div style="font-size:13px;line-height:2">
+          <div><b>Сегодня (${fmtDate(s.since_today)}):</b> ${row(s.today)}</div>
+          <div><b>Месяц (с ${fmtDate(s.since_month)}):</b> ${row(s.month)}</div>
+        </div>
+        <div style="font-size:11px;opacity:.5;margin-top:4px">Сырые данные, неуникальные пользователи</div>`;
     }
 
     function toggleCategory(catKey) {
