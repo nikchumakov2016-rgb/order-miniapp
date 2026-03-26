@@ -221,6 +221,29 @@ const STATUS_LABELS: Record<string, string> = {
   NOT_FOUND:            "Заказ не найден",
 };
 
+let _fallbackClientId: string | null = null;
+
+function getClientId(): string {
+  try {
+    const KEY = 'analytics_client_id';
+    let id = localStorage.getItem(KEY);
+    if (!id) {
+      id = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2) + Date.now().toString(36);
+      localStorage.setItem(KEY, id);
+    }
+    return id;
+  } catch {
+    if (!_fallbackClientId) {
+      _fallbackClientId = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    }
+    return _fallbackClientId;
+  }
+}
+
 function App() {
   const API_BASE = (import.meta as any).env?.VITE_API_BASE ?? "";
   const [isTest] = useState(() => {
@@ -235,6 +258,9 @@ function App() {
     return sessionStorage.getItem('is_test') === '1';
   });
   const testQ = isTest ? '&is_test=true' : '';
+  const tgUserId = ((window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id as number | undefined) || null;
+  const channel = tgUserId ? 'telegram' : 'web';
+  const userKey = tgUserId ? `tg:${tgUserId}` : `web:${getClientId()}`;
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -283,9 +309,11 @@ const isScheduledTimeInFuture =
     const tg = window.Telegram?.WebApp;
     if (tg) {
       tg.ready();
-      const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
-      fetch(`${API_BASE}/api/track/menu_open?tg_user_id=${tgUser?.id || 0}${testQ}`, { method: "POST" }).catch(() => {});
       try { tg.expand(); } catch {}
+    }
+    if (!sessionStorage.getItem('analytics_menu_open_sent')) {
+      sessionStorage.setItem('analytics_menu_open_sent', '1');
+      fetch(`${API_BASE}/api/track/menu_open?tg_user_id=${tgUserId || 0}${testQ}&channel=${channel}&user_key=${encodeURIComponent(userKey)}`, { method: "POST" }).catch(() => {});
     }
     fetch(`${API_BASE}/api/catalog`)
       .then((r) => r.json())
@@ -370,8 +398,7 @@ const isScheduledTimeInFuture =
   }, [cart]);
 
   const addToCart = useCallback((item: CatalogItem) => {
-    const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
-    fetch(`${API_BASE}/api/track/cart_add?tg_user_id=${tgUser?.id || 0}${testQ}`, { method: "POST" }).catch(() => {});
+    fetch(`${API_BASE}/api/track/cart_add?tg_user_id=${tgUserId || 0}${testQ}&channel=${channel}&user_key=${encodeURIComponent(userKey)}`, { method: "POST" }).catch(() => {});
     setCart((prev) => {
       const existing = prev[item.id];
       return { ...prev, [item.id]: { item, qty: existing ? existing.qty + 1 : 1 } };
@@ -441,7 +468,7 @@ const isScheduledTimeInFuture =
       const resp = await fetch(`${API_BASE}/api/orders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, client_tg_user_id: clientTgUserId, is_test: isTest }),
+        body: JSON.stringify({ ...payload, client_tg_user_id: clientTgUserId, is_test: isTest, channel, user_key: userKey }),
       });
 
       const data = await resp.json().catch(() => ({}));
@@ -611,8 +638,7 @@ window.history.replaceState(null, '', _u.toString());
       {cartCount > 0 && !showCart && (
         <div style={S.bottomBar}>
           <button style={S.mainButton(false)} onClick={() => {
-            const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
-            fetch(`${API_BASE}/api/track/cart_open?tg_user_id=${tgUser?.id || 0}${testQ}`, { method: "POST" }).catch(() => {});
+            fetch(`${API_BASE}/api/track/cart_open?tg_user_id=${tgUserId || 0}${testQ}&channel=${channel}&user_key=${encodeURIComponent(userKey)}`, { method: "POST" }).catch(() => {});
             setShowCart(true);
           }}>Оформить — {cartTotal}{currency}</button>
           <button style={S.cartButton} onClick={() => setShowCart(true)}>🛒<span style={S.badge}>{cartCount}</span></button>

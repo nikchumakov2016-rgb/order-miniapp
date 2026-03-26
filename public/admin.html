@@ -15,6 +15,11 @@
              background: #3390ec; color: #fff; font-size: 13px; }
     .error { color: #c0392b; margin: 8px 0; font-size: 14px; }
     .toggle { background: #eee; color: #555; white-space: nowrap; flex-shrink: 0; }
+    .stats-mobile { display: none; }
+    @media (max-width: 640px) {
+      .stats-desktop { display: none !important; }
+      .stats-mobile { display: block !important; }
+    }
   </style>
 </head>
 <body>
@@ -27,7 +32,10 @@
     <button onclick="load()">Загрузить</button>
   </div>
   <div id="error" class="error"></div>
-  <div id="stats"></div>
+  <details id="stats-details" style="margin:8px 0;display:none">
+    <summary style="cursor:pointer;font-size:15px;font-weight:600;padding:8px 0">Статистика</summary>
+    <div id="stats-v2"></div>
+  </details>
   <div id="stock"></div>
   <div id="stock-error" class="error"></div>
   <div id="orders"></div>
@@ -37,6 +45,7 @@
     let lastKnownId = null;
     let audioCtx = null;
     let openCategories = new Set();
+    let statsLoadedOnce = false;
 
     function beep() {
       if (!audioCtx) return;
@@ -125,9 +134,19 @@
         .then(rc => rc.ok ? rc.json() : null)
         .then(catalog => { if (catalog) { clearStockError(); renderStock(catalog.categories || []); } })
         .catch(() => {});
-      fetch(`${base()}/api/admin/stats`, { headers: { 'X-Admin-Token': token }, cache: 'no-store' })
+      if (!statsLoadedOnce) {
+        document.getElementById('stats-details').style.display = 'none';
+        document.getElementById('stats-v2').innerHTML = '';
+      }
+      fetch(`${base()}/api/admin/stats/v2`, { headers: { 'X-Admin-Token': token }, cache: 'no-store' })
         .then(r => r.ok ? r.json() : null)
-        .then(stats => { if (stats) renderStats(stats); })
+        .then(stats => {
+          if (stats) {
+            renderStatsV2(stats);
+            document.getElementById('stats-details').style.display = '';
+            statsLoadedOnce = true;
+          }
+        })
         .catch(() => {});
       clearInterval(refreshInterval);
       refreshInterval = setInterval(load, 15000);
@@ -155,16 +174,64 @@
 
     function fmtDate(iso) { const p = iso.split('-'); return `${p[2]}.${p[1]}.${p[0].slice(2)}`; }
 
-    function renderStats(s) {
-      const row = (d) =>
-        `<span>📋 Меню: ${d.menu_opens}</span> · <span>➕ В корзину: ${d.cart_adds}</span> · <span>🛒 Корзина: ${d.cart_opens}</span> · <span>✅ Заказы: ${d.orders}</span>`;
-      document.getElementById('stats').innerHTML = `
-        <h3 style="margin:16px 0 8px;font-size:15px">Статистика</h3>
-        <div style="font-size:13px;line-height:2">
-          <div><b>Сегодня (${fmtDate(s.since_today)}):</b> ${row(s.today)}</div>
-          <div><b>Месяц (с ${fmtDate(s.since_month)}):</b> ${row(s.month)}</div>
+    function renderStatsV2(s) {
+      const stages = [
+        ['menu_open',     '📋 Меню'],
+        ['cart_add',      '➕ В корзину'],
+        ['cart_open',     '🛒 Корзина'],
+        ['order_created', '✅ Заказ'],
+      ];
+      const chLabels = { web: '🌐 Web', telegram: '💬 Telegram', total: '📊 Итого' };
+      const channels = ['web', 'telegram', 'total'];
+
+      function periodTable(period, label) {
+        const headerCells = channels.map(ch => `<th colspan="2" style="text-align:center;padding:4px 8px">${chLabels[ch]}</th>`).join('');
+        const subHeader = channels.map(() => `<th style="text-align:right;padding:2px 8px;font-weight:400;opacity:.6">Всего</th><th style="text-align:right;padding:2px 8px;font-weight:400;opacity:.6">Без повторов</th>`).join('');
+        const rows = stages.map(([key, lbl]) => {
+          const cells = channels.map(ch => {
+            const d = period[ch]?.[key] || { raw: 0, unique: 0 };
+            return `<td style="text-align:right;padding:3px 8px">${d.raw}</td><td style="text-align:right;padding:3px 8px;opacity:.7">${d.unique}</td>`;
+          }).join('');
+          return `<tr><td style="padding:3px 8px">${lbl}</td>${cells}</tr>`;
+        }).join('');
+        return `
+          <div style="margin-bottom:12px">
+            <b>${label}</b>
+            <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:4px">
+              <tr><th></th>${headerCells}</tr>
+              <tr><th></th>${subHeader}</tr>
+              ${rows}
+            </table>
+          </div>`;
+      }
+
+      function periodCards(period, label) {
+        const cards = channels.map(ch => {
+          const chData = period[ch] || {};
+          const rows = stages.map(([key, lbl]) => {
+            const d = chData[key] || { raw: 0, unique: 0 };
+            return `<tr><td style="padding:2px 0">${lbl}</td><td style="text-align:right;padding:2px 6px">${d.raw}</td><td style="text-align:right;padding:2px 0">${d.unique}</td></tr>`;
+          }).join('');
+          return `<div style="border:1px solid #eee;border-radius:8px;padding:8px 12px;margin-bottom:6px">
+            <div style="font-size:14px;font-weight:600;margin-bottom:4px">${chLabels[ch]}</div>
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <tr><th></th><th style="text-align:right;padding:0 6px;font-weight:400;opacity:.5;font-size:11px">Всего</th><th style="text-align:right;font-weight:400;opacity:.5;font-size:11px">Уник.</th></tr>
+              ${rows}
+            </table>
+          </div>`;
+        }).join('');
+        return `<div style="margin-bottom:12px"><b>${label}</b><div style="margin-top:4px">${cards}</div></div>`;
+      }
+
+      document.getElementById('stats-v2').innerHTML = `
+        <div class="stats-desktop">
+          ${periodTable(s.today, `Сегодня (${fmtDate(s.since_today)})`)}
+          ${periodTable(s.month, `Месяц (с ${fmtDate(s.since_month)})`)}
         </div>
-        <div style="font-size:11px;opacity:.5;margin-top:4px">Сырые данные, неуникальные пользователи</div>`;
+        <div class="stats-mobile">
+          ${periodCards(s.today, `Сегодня (${fmtDate(s.since_today)})`)}
+          ${periodCards(s.month, `Месяц (с ${fmtDate(s.since_month)})`)}
+        </div>`;
     }
 
     function toggleCategory(catKey) {
