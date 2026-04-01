@@ -264,7 +264,28 @@ function App() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState<string>("all");
+  const [showSections, setShowSections] = useState(false);
+  const sectionsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showSections) return;
+    const handler = (e: MouseEvent) => {
+      if (sectionsRef.current && !sectionsRef.current.contains(e.target as Node)) {
+        setShowSections(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showSections]);
+
+  function scrollToSection(id: string) {
+    setShowSections(false);
+    const el = document.getElementById(id);
+    if (!el) return;
+    const y = el.getBoundingClientRect().top + window.scrollY - 80;
+    window.scrollTo({ top: y, behavior: "smooth" });
+  }
+
   const [cart, setCart] = useState<Record<string, CartEntry>>({});
   const [showCart, setShowCart] = useState(false);
   const [address, setAddress] = useState("");
@@ -418,11 +439,21 @@ const isScheduledTimeInFuture =
   const cartEntries = useMemo(() => Object.values(cart), [cart]);
   const cartCount = useMemo(() => cartEntries.reduce((s, e) => s + e.qty, 0), [cartEntries]);
   const cartTotal = useMemo(() => cartEntries.reduce((s, e) => s + e.item.price * e.qty, 0), [cartEntries]);
-  const visibleCategories = useMemo(() => {
+  const allCategories = catalog?.categories ?? [];
+
+  const POPULAR_IDS = ["h1", "p1", "s1", "o2"];
+  const popularItems = useMemo(() => {
     if (!catalog) return [];
-    if (activeTab === "all") return catalog.categories;
-    return catalog.categories.filter((c) => c.id === activeTab);
-  }, [catalog, activeTab]);
+    const itemMap = new Map<string, CatalogItem & { catName: string }>();
+    for (const cat of catalog.categories) {
+      for (const item of cat.items) {
+        itemMap.set(item.id, { ...item, category: cat.name, catName: cat.name });
+      }
+    }
+    return POPULAR_IDS.map(id => itemMap.get(id)).filter(Boolean) as (CatalogItem & { catName: string })[];
+  }, [catalog]);
+
+  const IMAGE_POS: Record<string, string> = { o1: "center 70%", k3: "center 35%", p1: "center 30%" };
 
   async function submitOrder() {
     if (cartEntries.length === 0 || !address.trim()) return;
@@ -598,40 +629,146 @@ window.history.replaceState(null, '', _u.toString());
       {isTest && <div style={{position:'fixed',top:0,left:0,right:0,zIndex:9999,background:'#ff3b30',color:'#fff',fontSize:11,fontWeight:700,textAlign:'center' as const,padding:'3px 0',letterSpacing:'1px'}}>ТЕСТОВЫЙ РЕЖИМ</div>}
       <div style={S.header}>
         <h1 style={S.shopName}>{catalog.shop_name}</h1>
-        <div style={S.tabs}>
-          <button style={S.tab(activeTab === "all")} onClick={() => setActiveTab("all")}>Всё меню</button>
-          {catalog.categories.map((cat) => (
-            <button key={cat.id} style={S.tab(activeTab === cat.id)} onClick={() => setActiveTab(cat.id)}>{cat.emoji} {cat.name}</button>
-          ))}
+        <div style={{ position: "relative" }} ref={sectionsRef}>
+          <button
+            onClick={() => setShowSections(v => !v)}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 10,
+              border: "none",
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: "pointer",
+              background: tgVar("secondary-bg-color", "#f0f0f0"),
+              color: tgVar("text-color", "#1a1a1a"),
+            }}
+          >
+            ☰ Разделы
+          </button>
+          {showSections && (
+            <div style={{
+              position: "absolute",
+              top: "calc(100% + 6px)",
+              left: 0,
+              right: 0,
+              background: tgVar("bg-color", "#ffffff"),
+              borderRadius: 12,
+              boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
+              padding: "6px 0",
+              zIndex: 100,
+              maxWidth: 260,
+            }}>
+              <button
+                onClick={() => scrollToSection("section-popular")}
+                style={{
+                  display: "block", width: "100%", padding: "10px 16px",
+                  border: "none", background: "none", textAlign: "left" as const,
+                  fontSize: 14, cursor: "pointer",
+                  color: tgVar("text-color", "#1a1a1a"),
+                }}
+              >
+                ⭐ Популярное
+              </button>
+              {allCategories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => scrollToSection(`section-${cat.id}`)}
+                  style={{
+                    display: "block", width: "100%", padding: "10px 16px",
+                    border: "none", background: "none", textAlign: "left" as const,
+                    fontSize: 14, cursor: "pointer",
+                    color: tgVar("text-color", "#1a1a1a"),
+                  }}
+                >
+                  {cat.emoji} {cat.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {visibleCategories.map((cat) => (
-        <div key={cat.id} style={S.section}>
-          <div style={S.sectionTitle}>{cat.emoji} {cat.name}</div>
-          {cat.items.map((item) => {
-            const inCart = cart[item.id];
-            return (
-              <div key={item.id} style={S.card}>
-                {item.image && <img src={item.image} alt={item.name} style={{ width: 64, height: 64, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />}
-                <div style={S.cardLeft}>
-                  <div style={S.cardName}>{item.name}</div>
-                  <div style={S.cardPrice}>{item.price}{currency} / {item.unit}</div>
-                </div>
-                {inCart ? (
-                  <div style={S.qtyControls}>
-                    <button style={S.qtyBtn} onClick={() => changeQty(item.id, -1)}>−</button>
-                    <span style={S.qtyText}>{inCart.qty}</span>
-                    <button style={S.qtyBtn} onClick={() => changeQty(item.id, 1)}>+</button>
+      {popularItems.length > 0 && (
+        <div id="section-popular" style={S.section}>
+          <div style={S.sectionTitle}>⭐ Популярное</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            {popularItems.map((item) => {
+              const inCart = cart[item.id];
+              return (
+                <div key={item.id} style={{
+                  display: "flex", flexDirection: "column" as const,
+                  borderRadius: 14, background: tgVar("secondary-bg-color", "#f7f7f8"),
+                  overflow: "hidden",
+                }}>
+                  {item.image && (
+                    <img src={item.image} alt={item.name} style={{
+                      width: "100%", aspectRatio: "3/2", objectFit: "cover", display: "block",
+                      ...(IMAGE_POS[item.id] && { objectPosition: IMAGE_POS[item.id] }),
+                    }} />
+                  )}
+                  <div style={{ padding: "8px 10px 10px", display: "flex", flexDirection: "column" as const, flex: 1 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3, marginBottom: 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>{item.name}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, opacity: 0.55, marginBottom: 8 }}>{item.price}{currency} / {item.unit}</div>
+                    <div style={{ marginTop: "auto" }}>
+                      {inCart ? (
+                        <div style={{ ...S.qtyControls, justifyContent: "center" }}>
+                          <button style={{ ...S.qtyBtn, width: 30, height: 30, fontSize: 18 }} onClick={() => changeQty(item.id, -1)}>−</button>
+                          <span style={{ ...S.qtyText, width: 32, fontSize: 15 }}>{inCart.qty}</span>
+                          <button style={{ ...S.qtyBtn, width: 30, height: 30, fontSize: 18 }} onClick={() => changeQty(item.id, 1)}>+</button>
+                        </div>
+                      ) : item.in_stock === false ? (
+                        <div style={{ color: "#999", fontSize: 13, textAlign: "center" as const }}>Нет в наличии</div>
+                      ) : (
+                        <button style={{ ...S.addBtn, width: "100%", padding: "7px 0", fontSize: 13 }} onClick={() => addToCart({ ...item, category: item.catName })}>+ Добавить</button>
+                      )}
+                    </div>
                   </div>
-                ) : item.in_stock === false ? (
-                  <div style={{ color: "#999", fontSize: "0.85em", padding: "4px 8px" }}>Нет в наличии</div>
-                ) : (
-                  <button style={S.addBtn} onClick={() => addToCart({ ...item, category: cat.name })}>+ Добавить</button>
-                )}
-              </div>
-            );
-          })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {allCategories.map((cat) => (
+        <div key={cat.id} id={`section-${cat.id}`} style={S.section}>
+          <div style={S.sectionTitle}>{cat.emoji} {cat.name}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            {cat.items.map((item) => {
+              const inCart = cart[item.id];
+              return (
+                <div key={item.id} style={{
+                  display: "flex", flexDirection: "column" as const,
+                  borderRadius: 14, background: tgVar("secondary-bg-color", "#f7f7f8"),
+                  overflow: "hidden",
+                }}>
+                  {item.image && (
+                    <img src={item.image} alt={item.name} style={{
+                      width: "100%", aspectRatio: "3/2", objectFit: "cover", display: "block",
+                      ...(IMAGE_POS[item.id] && { objectPosition: IMAGE_POS[item.id] }),
+                    }} />
+                  )}
+                  <div style={{ padding: "8px 10px 10px", display: "flex", flexDirection: "column" as const, flex: 1 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3, marginBottom: 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>{item.name}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, opacity: 0.55, marginBottom: 8 }}>{item.price}{currency} / {item.unit}</div>
+                    <div style={{ marginTop: "auto" }}>
+                      {inCart ? (
+                        <div style={{ ...S.qtyControls, justifyContent: "center" }}>
+                          <button style={{ ...S.qtyBtn, width: 30, height: 30, fontSize: 18 }} onClick={() => changeQty(item.id, -1)}>−</button>
+                          <span style={{ ...S.qtyText, width: 32, fontSize: 15 }}>{inCart.qty}</span>
+                          <button style={{ ...S.qtyBtn, width: 30, height: 30, fontSize: 18 }} onClick={() => changeQty(item.id, 1)}>+</button>
+                        </div>
+                      ) : item.in_stock === false ? (
+                        <div style={{ color: "#999", fontSize: 13, textAlign: "center" as const }}>Нет в наличии</div>
+                      ) : (
+                        <button style={{ ...S.addBtn, width: "100%", padding: "7px 0", fontSize: 13 }} onClick={() => addToCart({ ...item, category: cat.name })}>+ Добавить</button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       ))}
 
