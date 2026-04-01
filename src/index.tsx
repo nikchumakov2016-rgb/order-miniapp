@@ -10,6 +10,8 @@ declare global {
 type CatalogItem = {
   id: string;
   name: string;
+  title?: string;
+  subtitle?: string;
   price: number;
   unit: string;
   in_stock?: boolean;
@@ -43,7 +45,7 @@ const S = {
   app: {
     fontFamily: `-apple-system, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`,
     minHeight: "100vh",
-    background: tgVar("bg-color", "#ffffff"),
+    background: tgVar("bg-color", "#f7f5f2"),
     color: tgVar("text-color", "#1a1a1a"),
     paddingBottom: 100,
   } as React.CSSProperties,
@@ -51,15 +53,18 @@ const S = {
     position: "sticky" as const,
     top: 0,
     zIndex: 100,
-    background: tgVar("bg-color", "#ffffff"),
-    borderBottom: `1px solid ${tgVar("secondary-bg-color", "#f0f0f0")}`,
-    padding: "14px 16px 0",
+    background: tgVar("bg-color", "#f7f5f2"),
+    borderBottom: `1px solid ${tgVar("secondary-bg-color", "#e8e3dc")}`,
+    padding: "14px 16px 12px",
   } as React.CSSProperties,
   shopName: {
-    fontSize: 22,
+    fontFamily: `"Cormorant Garamond", Georgia, serif`,
+    fontSize: 30,
     fontWeight: 700,
-    margin: "0 0 12px",
-    letterSpacing: "-0.3px",
+    color: "#1c110a",
+    margin: "0 0 8px",
+    letterSpacing: "0.3px",
+    lineHeight: 1.15,
   } as React.CSSProperties,
   tabs: {
     display: "flex",
@@ -282,7 +287,7 @@ function App() {
     setShowSections(false);
     const el = document.getElementById(id);
     if (!el) return;
-    const y = el.getBoundingClientRect().top + window.scrollY - 80;
+    const y = el.getBoundingClientRect().top + window.scrollY - 128;
     window.scrollTo({ top: y, behavior: "smooth" });
   }
 
@@ -629,6 +634,24 @@ window.history.replaceState(null, '', _u.toString());
       {isTest && <div style={{position:'fixed',top:0,left:0,right:0,zIndex:9999,background:'#ff3b30',color:'#fff',fontSize:11,fontWeight:700,textAlign:'center' as const,padding:'3px 0',letterSpacing:'1px'}}>ТЕСТОВЫЙ РЕЖИМ</div>}
       <div style={S.header}>
         <h1 style={S.shopName}>{catalog.shop_name}</h1>
+        {bizPhone && (
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            <a href={`tel:${bizPhone}`} style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              padding: "5px 12px", borderRadius: 8,
+              background: tgVar("secondary-bg-color", "#ede8e0"),
+              color: tgVar("text-color", "#1a1a1a"),
+              fontSize: 13, fontWeight: 500, textDecoration: "none",
+            }}>📞 Позвонить</a>
+            <a href="https://max.ru/join/FZnl85uOe410NmUxA0dDMyFYf90-aJkBOweY_tPkUr4" target="_blank" rel="noreferrer" style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              padding: "5px 12px", borderRadius: 8,
+              background: tgVar("secondary-bg-color", "#ede8e0"),
+              color: tgVar("text-color", "#1a1a1a"),
+              fontSize: 13, fontWeight: 500, textDecoration: "none",
+            }}>💬 Чат MAX</a>
+          </div>
+        )}
         <div style={{ position: "relative" }} ref={sectionsRef}>
           <button
             onClick={() => setShowSections(v => !v)}
@@ -707,7 +730,9 @@ window.history.replaceState(null, '', _u.toString());
                     }} />
                   )}
                   <div style={{ padding: "8px 10px 10px", display: "flex", flexDirection: "column" as const, flex: 1 }}>
-                    <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3, marginBottom: 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>{item.name}</div>
+                    <div style={{ fontSize: 11, opacity: 0.4, marginBottom: 2, textTransform: "uppercase" as const, letterSpacing: "0.3px" }}>{item.catName}</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3, marginBottom: item.subtitle ? 2 : 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>{item.title ?? item.name}</div>
+                    {item.subtitle && <div style={{ fontSize: 12, opacity: 0.5, marginBottom: 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical" as const }}>{item.subtitle}</div>}
                     <div style={{ fontSize: 14, fontWeight: 600, opacity: 0.55, marginBottom: 8 }}>{item.price}{currency} / {item.unit}</div>
                     <div style={{ marginTop: "auto" }}>
                       {inCart ? (
@@ -742,14 +767,23 @@ window.history.replaceState(null, '', _u.toString());
                   borderRadius: 14, background: tgVar("secondary-bg-color", "#f7f7f8"),
                   overflow: "hidden",
                 }}>
-                  {item.image && (
+                  {item.image ? (
                     <img src={item.image} alt={item.name} style={{
                       width: "100%", aspectRatio: "3/2", objectFit: "cover", display: "block",
                       ...(IMAGE_POS[item.id] && { objectPosition: IMAGE_POS[item.id] }),
                     }} />
+                  ) : (
+                    <div style={{
+                      width: "100%", aspectRatio: "3/2", display: "flex",
+                      alignItems: "center", justifyContent: "center",
+                      background: "#f0ebe3", color: "#b0a898", fontSize: 11,
+                    }}>
+                      Фото скоро появится
+                    </div>
                   )}
                   <div style={{ padding: "8px 10px 10px", display: "flex", flexDirection: "column" as const, flex: 1 }}>
-                    <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3, marginBottom: 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>{item.name}</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3, marginBottom: item.subtitle ? 2 : 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>{item.title ?? item.name}</div>
+                    {item.subtitle && <div style={{ fontSize: 12, opacity: 0.5, marginBottom: 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical" as const }}>{item.subtitle}</div>}
                     <div style={{ fontSize: 14, fontWeight: 600, opacity: 0.55, marginBottom: 8 }}>{item.price}{currency} / {item.unit}</div>
                     <div style={{ marginTop: "auto" }}>
                       {inCart ? (
