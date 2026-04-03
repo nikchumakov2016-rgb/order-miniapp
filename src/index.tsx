@@ -269,6 +269,16 @@ function App() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showWhereToBuy, setShowWhereToBuy] = useState(false);
+
+  const WHERE_TO_BUY: { city: string; name: string; address: string }[] = [
+    { city: "Оренбург", name: "Гармония", address: "ДНТ Лидиния, ул. Плодовая, 39" },
+    { city: "Оренбург", name: "Домашкино", address: "ул. Мясокомбинат, д. 1" },
+    { city: "Оренбург", name: "Фрэш Маркет", address: "Северный проезд, 18/1" },
+    { city: "Оренбург", name: "Продуктовый отдел", address: "ул. Орлова, д. 5" },
+    { city: "Оренбург", name: "Продукты 24", address: "ул. Постникова, д. 20" },
+    { city: "Оренбург", name: "Магазин у Дома", address: "пос. Аэропорт, ул. Центральная, д. 4" },
+  ];
   const [showSections, setShowSections] = useState(false);
   const sectionsRef = useRef<HTMLDivElement>(null);
 
@@ -650,6 +660,13 @@ window.history.replaceState(null, '', _u.toString());
               color: tgVar("text-color", "#1a1a1a"),
               fontSize: 13, fontWeight: 500, textDecoration: "none",
             }}>💬 Чат MAX</a>
+            <button onClick={() => setShowWhereToBuy(true)} style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              padding: "5px 12px", borderRadius: 8, border: "none", cursor: "pointer",
+              background: tgVar("secondary-bg-color", "#ede8e0"),
+              color: tgVar("text-color", "#1a1a1a"),
+              fontSize: 13, fontWeight: 500,
+            }}>📍 Где купить</button>
           </div>
         )}
         <div style={{ position: "relative" }} ref={sectionsRef}>
@@ -813,6 +830,48 @@ window.history.replaceState(null, '', _u.toString());
             setShowCart(true);
           }}>Оформить — {cartTotal}{currency}</button>
           <button style={S.cartButton} onClick={() => setShowCart(true)}>🛒<span style={S.badge}>{cartCount}</span></button>
+        </div>
+      )}
+
+      {showWhereToBuy && (
+        <div style={S.overlay}>
+          <div style={S.overlayHeader}>
+            <span style={S.overlayTitle}>Где купить</span>
+            <button style={S.closeBtn} onClick={() => setShowWhereToBuy(false)}>×</button>
+          </div>
+          <p style={{ fontSize: 14, lineHeight: 1.6, color: tgVar("text-color", "#1a1a1a"), opacity: 0.8, margin: "0 0 20px" }}>
+            Продукцию «Римских пельменей» можно найти в нескольких торговых точках Оренбурга. Наличие и ассортимент лучше уточнять заранее.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column" as const, gap: 10, marginBottom: 20 }}>
+            {(() => {
+              const cities = [...new Set(WHERE_TO_BUY.map(p => p.city))];
+              return cities.map(city => (
+                <div key={city}>
+                  <div style={{ fontSize: 12, fontWeight: 600, opacity: 0.45, textTransform: "uppercase" as const, letterSpacing: "0.5px", marginBottom: 6 }}>{city}</div>
+                  {WHERE_TO_BUY.filter(p => p.city === city).map((point, i) => (
+                    <div key={i} style={{ padding: "10px 12px", borderRadius: 10, background: tgVar("secondary-bg-color", "#f0ebe3"), marginBottom: 6 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600 }}>{point.name}</div>
+                      <div style={{ fontSize: 13, opacity: 0.6, marginTop: 2 }}>{point.address}</div>
+                    </div>
+                  ))}
+                </div>
+              ));
+            })()}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <a href={`tel:${bizPhone}`} style={{
+              flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              padding: "12px 0", borderRadius: 12,
+              background: tgVar("button-color", "#3390ec"), color: tgVar("button-text-color", "#ffffff"),
+              fontSize: 14, fontWeight: 600, textDecoration: "none",
+            }}>📞 Позвонить Риму</a>
+            <a href="https://max.ru/join/FZnl85uOe410NmUxA0dDMyFYf90-aJkBOweY_tPkUr4" target="_blank" rel="noreferrer" style={{
+              flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              padding: "12px 0", borderRadius: 12,
+              background: tgVar("secondary-bg-color", "#ede8e0"), color: tgVar("text-color", "#1a1a1a"),
+              fontSize: 14, fontWeight: 600, textDecoration: "none",
+            }}>💬 Написать в MAX</a>
+          </div>
         </div>
       )}
 
