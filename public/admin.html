@@ -366,6 +366,7 @@
                 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
                   <input id="efile-${esc(item.id)}" type="file" accept="image/jpeg,image/png,image/webp" style="font-size:12px;max-width:180px">
                   <button onclick="uploadImage('${esc(item.id)}')" style="padding:5px 12px;border:none;border-radius:6px;background:#555;color:#fff;font-size:12px;cursor:pointer">Загрузить фото</button>
+                  <button id="edelete-${esc(item.id)}" onclick="deleteImage('${esc(item.id)}')" style="padding:5px 12px;border:none;border-radius:6px;background:#e74c3c;color:#fff;font-size:12px;cursor:pointer;${(item.image||'').startsWith('/uploads/items/')?'':'display:none'}">Удалить фото</button>
                   <span id="eimgmsg-${esc(item.id)}" style="font-size:12px;opacity:.6"></span>
                 </div>
               </div>
@@ -423,12 +424,40 @@
         thumb.src = `${base()}${data.image}?t=${Date.now()}`;
         thumb.style.display = '';
       }
+      if (data.image && data.image.startsWith('/uploads/items/')) {
+        const delBtn = document.getElementById(`edelete-${itemId}`);
+        if (delBtn) delBtn.style.display = '';
+      }
       for (const cat of editorCatalog) {
         for (const item of cat.items) {
           if (item.id === itemId) { item.image = data.image; break; }
         }
       }
       fileInput.value = '';
+    }
+
+    async function deleteImage(itemId) {
+      clearEditorError();
+      const { value: token, error: tokenError } = sanitizeToken(tok());
+      if (tokenError) { showEditorError(tokenError); return; }
+      const msgEl = document.getElementById(`eimgmsg-${itemId}`);
+      if (msgEl) msgEl.textContent = 'Удаляется…';
+      const r = await fetch(`${base()}/api/admin/catalog/items/${itemId}/image`, {
+        method: 'DELETE',
+        headers: { 'X-Admin-Token': token },
+      }).catch(() => { showEditorError('Не удалось подключиться.'); if (msgEl) msgEl.textContent = ''; return null; });
+      if (!r) return;
+      if (!r.ok) { showEditorError(await parseError(r)); if (msgEl) msgEl.textContent = ''; return; }
+      if (msgEl) { msgEl.textContent = '✓ Фото удалено'; setTimeout(() => { msgEl.textContent = ''; }, 3000); }
+      const thumb = document.getElementById(`ethumb-${itemId}`);
+      if (thumb) { thumb.src = ''; thumb.style.display = 'none'; }
+      const delBtn = document.getElementById(`edelete-${itemId}`);
+      if (delBtn) delBtn.style.display = 'none';
+      for (const cat of editorCatalog) {
+        for (const item of cat.items) {
+          if (item.id === itemId) { delete item.image; break; }
+        }
+      }
     }
 
     async function moveItem(catId, itemId, dir) {
