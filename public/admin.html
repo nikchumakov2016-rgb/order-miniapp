@@ -38,6 +38,11 @@
   </details>
   <div id="stock"></div>
   <div id="stock-error" class="error"></div>
+  <details id="editor-details" style="margin:8px 0;display:none">
+    <summary style="cursor:pointer;font-size:15px;font-weight:600;padding:8px 0">Редактор товаров</summary>
+    <div id="editor-error" class="error"></div>
+    <div id="editor"></div>
+  </details>
   <div id="orders"></div>
 
   <script>
@@ -132,7 +137,14 @@
       render(orders);
       fetch(`${base()}/api/catalog`, { cache: 'no-store' })
         .then(rc => rc.ok ? rc.json() : null)
-        .then(catalog => { if (catalog) { clearStockError(); renderStock(catalog.categories || []); } })
+        .then(catalog => {
+          if (catalog) {
+            clearStockError();
+            renderStock(catalog.categories || []);
+            renderEditor(catalog.categories || []);
+            document.getElementById('editor-details').style.display = '';
+          }
+        })
         .catch(() => {});
       if (!statsLoadedOnce) {
         document.getElementById('stats-details').style.display = 'none';
@@ -299,6 +311,147 @@
       if (!r) return;
       if (!r.ok) { showError(await parseError(r)); return; }
       load(); // reload only on success
+    }
+
+    // ── Редактор товаров ──────────────────────────────────────────────
+    function esc(s) {
+      return String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    let editorCatalog = [];
+    let editorLoadedOnce = false;
+
+    function showEditorError(msg) { document.getElementById('editor-error').textContent = msg; }
+    function clearEditorError()   { document.getElementById('editor-error').textContent = ''; }
+
+    function renderEditor(categories) {
+      if (editorLoadedOnce) return;
+      editorLoadedOnce = true;
+      editorCatalog = categories;
+      const el = document.getElementById('editor');
+      if (!categories.length) { el.innerHTML = ''; return; }
+      el.innerHTML = categories.map(cat => `
+        <div style="margin-bottom:16px">
+          <div style="font-size:14px;font-weight:600;margin:10px 0 6px;opacity:.7">${cat.emoji || ''} ${cat.name}</div>
+          ${(cat.items || []).map((item, idx) => `
+            <div id="erow-${esc(item.id)}" style="border:1px solid #eee;border-radius:8px;padding:10px;margin-bottom:6px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <span style="font-size:13px;font-weight:600">${esc(item.name)}</span>
+                <span style="display:flex;gap:4px">
+                  <button onclick="moveItem('${esc(cat.id)}','${esc(item.id)}',-1)" style="padding:2px 7px;font-size:13px;border:1px solid #ddd;border-radius:4px;background:#fafafa;cursor:pointer" ${idx===0?'disabled':''}>↑</button>
+                  <button onclick="moveItem('${esc(cat.id)}','${esc(item.id)}',1)"  style="padding:2px 7px;font-size:13px;border:1px solid #ddd;border-radius:4px;background:#fafafa;cursor:pointer" ${idx===cat.items.length-1?'disabled':''}>↓</button>
+                </span>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+                <label style="font-size:12px;opacity:.6">Цена (₽)
+                  <input id="ep-${esc(item.id)}" type="number" step="1" value="${esc(item.price ?? '')}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+                </label>
+                <label style="font-size:12px;opacity:.6">В наличии
+                  <select id="es-${esc(item.id)}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+                    <option value="true"  ${item.in_stock!==false?'selected':''}>Есть</option>
+                    <option value="false" ${item.in_stock===false?'selected':''}>Нет</option>
+                  </select>
+                </label>
+                <label style="font-size:12px;opacity:.6">Заголовок (title)
+                  <input id="et-${esc(item.id)}" value="${esc(item.title||'')}" placeholder="${esc(item.name)}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+                </label>
+                <label style="font-size:12px;opacity:.6">Подзаголовок (subtitle)
+                  <input id="eu-${esc(item.id)}" value="${esc(item.subtitle||'')}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+                </label>
+              </div>
+              <button onclick="saveItem('${esc(item.id)}')" style="padding:6px 16px;border:none;border-radius:6px;background:#3390ec;color:#fff;font-size:13px;cursor:pointer">Сохранить</button>
+              <span id="emsg-${esc(item.id)}" style="font-size:12px;margin-left:8px;opacity:.6"></span>
+              <div style="margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <img id="ethumb-${esc(item.id)}" src="${esc(item.image||'')}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #eee;${item.image?'':'display:none'}">
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                  <input id="efile-${esc(item.id)}" type="file" accept="image/jpeg,image/png,image/webp" style="font-size:12px;max-width:180px">
+                  <button onclick="uploadImage('${esc(item.id)}')" style="padding:5px 12px;border:none;border-radius:6px;background:#555;color:#fff;font-size:12px;cursor:pointer">Загрузить фото</button>
+                  <span id="eimgmsg-${esc(item.id)}" style="font-size:12px;opacity:.6"></span>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `).join('');
+    }
+
+    async function saveItem(itemId) {
+      clearEditorError();
+      const { value: token, error: tokenError } = sanitizeToken(tok());
+      if (tokenError) { showEditorError(tokenError); return; }
+      const price = parseInt(document.getElementById(`ep-${itemId}`)?.value, 10);
+      const in_stock = document.getElementById(`es-${itemId}`)?.value === 'true';
+      const title    = document.getElementById(`et-${itemId}`)?.value ?? '';
+      const subtitle = document.getElementById(`eu-${itemId}`)?.value ?? '';
+      const body = { in_stock };
+      if (!isNaN(price)) body.price = price;
+      body.title    = title;
+      body.subtitle = subtitle;
+      const msgEl = document.getElementById(`emsg-${itemId}`);
+      if (msgEl) msgEl.textContent = '…';
+      const r = await fetch(`${base()}/api/admin/catalog/items/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).catch(() => { showEditorError('Не удалось подключиться.'); return null; });
+      if (!r) return;
+      if (!r.ok) { showEditorError(await parseError(r)); if (msgEl) msgEl.textContent = ''; return; }
+      if (msgEl) { msgEl.textContent = '✓ Сохранено'; setTimeout(() => { msgEl.textContent = ''; }, 2000); }
+    }
+
+    async function uploadImage(itemId) {
+      clearEditorError();
+      const { value: token, error: tokenError } = sanitizeToken(tok());
+      if (tokenError) { showEditorError(tokenError); return; }
+      const fileInput = document.getElementById(`efile-${itemId}`);
+      if (!fileInput?.files?.length) { showEditorError('Выберите файл'); return; }
+      const msgEl = document.getElementById(`eimgmsg-${itemId}`);
+      if (msgEl) msgEl.textContent = 'Загружается…';
+      const fd = new FormData();
+      fd.append('file', fileInput.files[0]);
+      const r = await fetch(`${base()}/api/admin/catalog/items/${itemId}/image`, {
+        method: 'POST',
+        headers: { 'X-Admin-Token': token },
+        body: fd,
+      }).catch(() => { showEditorError('Не удалось подключиться.'); if (msgEl) msgEl.textContent = ''; return null; });
+      if (!r) return;
+      if (!r.ok) { showEditorError(await parseError(r)); if (msgEl) msgEl.textContent = ''; return; }
+      const data = await r.json();
+      if (msgEl) { msgEl.textContent = '✓ Фото обновлено'; setTimeout(() => { msgEl.textContent = ''; }, 3000); }
+      const thumb = document.getElementById(`ethumb-${itemId}`);
+      if (thumb && data.image) {
+        thumb.src = `${base()}${data.image}?t=${Date.now()}`;
+        thumb.style.display = '';
+      }
+      for (const cat of editorCatalog) {
+        for (const item of cat.items) {
+          if (item.id === itemId) { item.image = data.image; break; }
+        }
+      }
+      fileInput.value = '';
+    }
+
+    async function moveItem(catId, itemId, dir) {
+      const cat = editorCatalog.find(c => c.id === catId);
+      if (!cat) return;
+      const items = [...cat.items];
+      const idx = items.findIndex(i => i.id === itemId);
+      if (idx < 0) return;
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= items.length) return;
+      [items[idx], items[newIdx]] = [items[newIdx], items[idx]];
+      cat.items = items;
+      const { value: token, error: tokenError } = sanitizeToken(tok());
+      if (tokenError) { showEditorError(tokenError); return; }
+      clearEditorError();
+      const r = await fetch(`${base()}/api/admin/catalog/categories/${catId}/reorder`, {
+        method: 'POST',
+        headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_ids: items.map(i => i.id) }),
+      }).catch(() => { showEditorError('Не удалось подключиться.'); return null; });
+      if (!r) return;
+      if (!r.ok) { showEditorError(await parseError(r)); return; }
+      renderEditor(editorCatalog);
     }
   </script>
 </body>
