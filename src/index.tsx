@@ -915,7 +915,7 @@ window.history.replaceState(null, '', _u.toString());
                 <input style={S.input} placeholder="Впишите сюда адрес доставки" value={address} onChange={(e) => setAddress(e.target.value)} />
 
                 <label style={S.label}>Комментарий</label>
-                <input style={S.input} placeholder="Домофон не работает, позвоните" value={comment} onChange={(e) => setComment(e.target.value)} />
+                <input style={S.input} placeholder="Если есть, впишите комментарий к заказу" value={comment} onChange={(e) => setComment(e.target.value)} />
 
                 <label style={S.label}>Когда доставить</label>
                 <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
