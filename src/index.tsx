@@ -909,10 +909,10 @@ window.history.replaceState(null, '', _u.toString());
 
               <div style={{ marginTop: 20 }}>
                 <label style={S.label}>Телефон для связи</label>
-                <input style={S.input} placeholder="+7 900 123-45-67" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" />
+                <input style={S.input} placeholder="Впишите сюда номер телефона" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" />
 
                 <label style={S.label}>Адрес доставки</label>
-                <input style={S.input} placeholder="ул. Ленина, д. 10, кв. 5" value={address} onChange={(e) => setAddress(e.target.value)} />
+                <input style={S.input} placeholder="Впишите сюда адрес доставки" value={address} onChange={(e) => setAddress(e.target.value)} />
 
                 <label style={S.label}>Комментарий</label>
                 <input style={S.input} placeholder="Домофон не работает, позвоните" value={comment} onChange={(e) => setComment(e.target.value)} />
