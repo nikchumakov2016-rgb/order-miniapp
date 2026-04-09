@@ -35,6 +35,8 @@ type Catalog = {
   categories: Category[];
 };
 type CartEntry = { item: CatalogItem; qty: number };
+type WhereToBuyPoint = { city: string; name: string; address: string; schedule?: string; note?: string };
+type WhereToBuyContent = { title: string; description: string; points: WhereToBuyPoint[] };
 
 
 function tgVar(name: string, fallback: string): string {
@@ -249,6 +251,19 @@ function getClientId(): string {
   }
 }
 
+const DEFAULT_WHERE_TO_BUY: WhereToBuyContent = {
+  title: "Где купить",
+  description: "Продукцию «Римских пельменей» можно найти в нескольких торговых точках Оренбурга. Наличие и ассортимент лучше уточнять заранее.",
+  points: [
+    { city: "Оренбург", name: "Гармония",          address: "ДНТ Лидиния, ул. Плодовая, 39" },
+    { city: "Оренбург", name: "Домашкино",         address: "ул. Мясокомбинат, д. 1" },
+    { city: "Оренбург", name: "Фрэш Маркет",       address: "Северный проезд, 18/1" },
+    { city: "Оренбург", name: "Продуктовый отдел", address: "ул. Орлова, д. 5" },
+    { city: "Оренбург", name: "Продукты 24",       address: "ул. Постникова, д. 20" },
+    { city: "Оренбург", name: "Магазин у Дома",    address: "пос. Аэропорт, ул. Центральная, д. 4" },
+  ],
+};
+
 function App() {
   const API_BASE = (import.meta as any).env?.VITE_API_BASE ?? "";
   const [isTest] = useState(() => {
@@ -270,15 +285,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showWhereToBuy, setShowWhereToBuy] = useState(false);
-
-  const WHERE_TO_BUY: { city: string; name: string; address: string }[] = [
-    { city: "Оренбург", name: "Гармония", address: "ДНТ Лидиния, ул. Плодовая, 39" },
-    { city: "Оренбург", name: "Домашкино", address: "ул. Мясокомбинат, д. 1" },
-    { city: "Оренбург", name: "Фрэш Маркет", address: "Северный проезд, 18/1" },
-    { city: "Оренбург", name: "Продуктовый отдел", address: "ул. Орлова, д. 5" },
-    { city: "Оренбург", name: "Продукты 24", address: "ул. Постникова, д. 20" },
-    { city: "Оренбург", name: "Магазин у Дома", address: "пос. Аэропорт, ул. Центральная, д. 4" },
-  ];
+  const [whereToBuy, setWhereToBuy] = useState<WhereToBuyContent>(DEFAULT_WHERE_TO_BUY);
   const [showSections, setShowSections] = useState(false);
   const sectionsRef = useRef<HTMLDivElement>(null);
 
@@ -355,6 +362,10 @@ const isScheduledTimeInFuture =
       .then((r) => r.json())
       .then((data: Catalog) => { setCatalog(data); document.title = data.shop_name; setLoading(false); })
       .catch((e) => { setError(`Не удалось загрузить каталог: ${e.message}`); setLoading(false); });
+    fetch(`${API_BASE}/api/content/where-to-buy`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: WhereToBuyContent | null) => { if (data) setWhereToBuy(data); })
+      .catch(() => {});
   }, [API_BASE]);
 
   useEffect(() => {
@@ -772,6 +783,28 @@ window.history.replaceState(null, '', _u.toString());
         </div>
       )}
 
+      <div style={{ padding: "12px 16px 8px" }}>
+        <a href="business.html" style={{
+          display: "block", padding: "14px", borderRadius: 16,
+          background: "#faf7f0", border: "1px solid rgba(0,0,0,.08)",
+          textDecoration: "none", color: "#1a1a1a",
+        }}>
+          <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.25, marginBottom: 4 }}>
+            У вас магазин или точка?
+          </div>
+          <div style={{ fontSize: 13, opacity: 0.78, lineHeight: 1.35, marginBottom: 10 }}>
+            Поставляем пельмени ручной лепки и другие позиции.{" "}
+            Подскажем, с чего проще начать.
+          </div>
+          <div style={{
+            display: "inline-block", fontSize: 13, fontWeight: 600,
+            padding: "8px 10px", borderRadius: 12, background: "rgba(0,0,0,.06)",
+          }}>
+            Подробнее →
+          </div>
+        </a>
+      </div>
+
       {allCategories.map((cat) => (
         <div key={cat.id} id={`section-${cat.id}`} style={S.section}>
           <div style={S.sectionTitle}>{cat.emoji} {cat.name}</div>
@@ -823,6 +856,14 @@ window.history.replaceState(null, '', _u.toString());
         </div>
       ))}
 
+      <div style={{ padding: "16px 16px 24px", textAlign: "center" as const }}>
+        <a href="business.html" style={{
+          fontSize: 12, opacity: 0.35,
+          color: tgVar("text-color", "#1a1a1a"),
+          textDecoration: "none",
+        }}>Для магазинов и партнёров →</a>
+      </div>
+
       {cartCount > 0 && !showCart && (
         <div style={S.bottomBar}>
           <button style={S.mainButton(false)} onClick={() => {
@@ -836,22 +877,24 @@ window.history.replaceState(null, '', _u.toString());
       {showWhereToBuy && (
         <div style={S.overlay}>
           <div style={S.overlayHeader}>
-            <span style={S.overlayTitle}>Где купить</span>
+            <span style={S.overlayTitle}>{whereToBuy.title}</span>
             <button style={S.closeBtn} onClick={() => setShowWhereToBuy(false)}>×</button>
           </div>
           <p style={{ fontSize: 14, lineHeight: 1.6, color: tgVar("text-color", "#1a1a1a"), opacity: 0.8, margin: "0 0 20px" }}>
-            Продукцию «Римских пельменей» можно найти в нескольких торговых точках Оренбурга. Наличие и ассортимент лучше уточнять заранее.
+            {whereToBuy.description}
           </p>
           <div style={{ display: "flex", flexDirection: "column" as const, gap: 10, marginBottom: 20 }}>
             {(() => {
-              const cities = [...new Set(WHERE_TO_BUY.map(p => p.city))];
+              const cities = [...new Set(whereToBuy.points.map(p => p.city))];
               return cities.map(city => (
                 <div key={city}>
                   <div style={{ fontSize: 12, fontWeight: 600, opacity: 0.45, textTransform: "uppercase" as const, letterSpacing: "0.5px", marginBottom: 6 }}>{city}</div>
-                  {WHERE_TO_BUY.filter(p => p.city === city).map((point, i) => (
+                  {whereToBuy.points.filter(p => p.city === city).map((point, i) => (
                     <div key={i} style={{ padding: "10px 12px", borderRadius: 10, background: tgVar("secondary-bg-color", "#f0ebe3"), marginBottom: 6 }}>
                       <div style={{ fontSize: 14, fontWeight: 600 }}>{point.name}</div>
                       <div style={{ fontSize: 13, opacity: 0.6, marginTop: 2 }}>{point.address}</div>
+                      {point.schedule ? <div style={{ fontSize: 12, opacity: 0.5, marginTop: 2 }}>{point.schedule}</div> : null}
+                      {point.note ? <div style={{ fontSize: 12, opacity: 0.5, marginTop: 1 }}>{point.note}</div> : null}
                     </div>
                   ))}
                 </div>

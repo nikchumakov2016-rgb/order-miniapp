@@ -34,6 +34,7 @@ export default defineConfig({
     host: true,
     proxy: {
       '/uploads': 'http://localhost:8000',
+      '/api': 'http://localhost:8000',
     },
   },
 });
