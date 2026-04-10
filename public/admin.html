@@ -397,7 +397,7 @@
             </label>
           </div>
           <button onclick="saveItem('${esc(item.id)}')" style="padding:6px 16px;border:none;border-radius:6px;background:#3390ec;color:#fff;font-size:13px;cursor:pointer">Сохранить</button>
-          <button onclick="reloadItem('${esc(item.id)}')" style="padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer;margin-left:6px">Перезагрузить с сервера</button>
+          <button onclick="reloadItem('${esc(item.id)}')" style="padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer;margin-left:6px">Сбросить изменения</button>
           <span id="emsg-${esc(item.id)}" style="font-size:12px;margin-left:8px;opacity:.6"></span>
           <div style="margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <img id="ethumb-${esc(item.id)}" src="${esc(item.image||'')}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #eee;${item.image?'':'display:none'}">
@@ -586,7 +586,7 @@
         <button onclick="wtbAddPoint()" style="margin:8px 0;padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer">+ Добавить точку</button>
         <div style="margin-top:12px">
           <button onclick="saveWtb()" style="padding:6px 16px;border:none;border-radius:6px;background:#3390ec;color:#fff;font-size:13px;cursor:pointer">Сохранить</button>
-          <button onclick="reloadWtb()" style="padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer;margin-left:6px">Перезагрузить с сервера</button>
+          <button onclick="reloadWtb()" style="padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer;margin-left:6px">Сбросить изменения</button>
           <span id="wtb-msg" style="font-size:12px;margin-left:8px;opacity:.6"></span>
         </div>
       `;
@@ -597,12 +597,18 @@
       commitWtbInputs();
       wtbPoints.push({ city: 'Оренбург', name: '', address: '', schedule: '', note: '' });
       renderWtbPoints();
+      wtbDirty = true;
+      const m = document.getElementById('wtb-msg');
+      if (m) { m.textContent = 'Есть несохранённые изменения'; m.style.cssText = 'font-size:12px;margin-left:8px;color:#92400e;font-weight:600;opacity:1'; }
     }
 
     function wtbRemovePoint(i) {
       commitWtbInputs();
       wtbPoints.splice(i, 1);
       renderWtbPoints();
+      wtbDirty = true;
+      const m = document.getElementById('wtb-msg');
+      if (m) { m.textContent = 'Есть несохранённые изменения'; m.style.cssText = 'font-size:12px;margin-left:8px;color:#92400e;font-weight:600;opacity:1'; }
     }
 
     async function saveWtb() {
@@ -714,7 +720,7 @@
         </div>
         <div style="margin-top:12px">
           <button onclick="saveFb()" style="padding:6px 16px;border:none;border-radius:6px;background:#3390ec;color:#fff;font-size:13px;cursor:pointer">Сохранить</button>
-          <button onclick="reloadFb()" style="padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer;margin-left:6px">Перезагрузить с сервера</button>
+          <button onclick="reloadFb()" style="padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer;margin-left:6px">Сбросить изменения</button>
           <span id="fb-msg" style="font-size:12px;margin-left:8px;opacity:.6"></span>
         </div>
       `;
