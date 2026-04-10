@@ -364,47 +364,52 @@
       el.innerHTML = categories.map(cat => `
         <div style="margin-bottom:16px">
           <div style="font-size:14px;font-weight:600;margin:10px 0 6px;opacity:.7">${cat.emoji || ''} ${cat.name}</div>
-          ${(cat.items || []).map((item, idx) => `
-            <div id="erow-${esc(item.id)}" style="border:1px solid #eee;border-radius:8px;padding:10px;margin-bottom:6px">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                <span style="font-size:13px;font-weight:600">${esc(item.name)}</span>
-                <span style="display:flex;gap:4px">
-                  <button onclick="moveItem('${esc(cat.id)}','${esc(item.id)}',-1)" style="padding:2px 7px;font-size:13px;border:1px solid #ddd;border-radius:4px;background:#fafafa;cursor:pointer" ${idx===0?'disabled':''}>↑</button>
-                  <button onclick="moveItem('${esc(cat.id)}','${esc(item.id)}',1)"  style="padding:2px 7px;font-size:13px;border:1px solid #ddd;border-radius:4px;background:#fafafa;cursor:pointer" ${idx===cat.items.length-1?'disabled':''}>↓</button>
-                </span>
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
-                <label style="font-size:12px;opacity:.6">Цена (₽)
-                  <input id="ep-${esc(item.id)}" type="number" step="1" value="${esc(item.price ?? '')}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
-                </label>
-                <label style="font-size:12px;opacity:.6">В наличии
-                  <select id="es-${esc(item.id)}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
-                    <option value="true"  ${item.in_stock!==false?'selected':''}>Есть</option>
-                    <option value="false" ${item.in_stock===false?'selected':''}>Нет</option>
-                  </select>
-                </label>
-                <label style="font-size:12px;opacity:.6">Заголовок (title)
-                  <input id="et-${esc(item.id)}" value="${esc(item.title||'')}" placeholder="${esc(item.name)}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
-                </label>
-                <label style="font-size:12px;opacity:.6">Подзаголовок (subtitle)
-                  <input id="eu-${esc(item.id)}" value="${esc(item.subtitle||'')}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
-                </label>
-              </div>
-              <button onclick="saveItem('${esc(item.id)}')" style="padding:6px 16px;border:none;border-radius:6px;background:#3390ec;color:#fff;font-size:13px;cursor:pointer">Сохранить</button>
-              <span id="emsg-${esc(item.id)}" style="font-size:12px;margin-left:8px;opacity:.6"></span>
-              <div style="margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                <img id="ethumb-${esc(item.id)}" src="${esc(item.image||'')}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #eee;${item.image?'':'display:none'}">
-                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                  <input id="efile-${esc(item.id)}" type="file" accept="image/jpeg,image/png,image/webp" style="font-size:12px;max-width:180px">
-                  <button onclick="uploadImage('${esc(item.id)}')" style="padding:5px 12px;border:none;border-radius:6px;background:#555;color:#fff;font-size:12px;cursor:pointer">Загрузить фото</button>
-                  <button id="edelete-${esc(item.id)}" onclick="deleteImage('${esc(item.id)}')" style="padding:5px 12px;border:none;border-radius:6px;background:#e74c3c;color:#fff;font-size:12px;cursor:pointer;${(item.image||'').startsWith('/uploads/items/')?'':'display:none'}">Удалить фото</button>
-                  <span id="eimgmsg-${esc(item.id)}" style="font-size:12px;opacity:.6"></span>
-                </div>
-              </div>
-            </div>
-          `).join('')}
+          ${(cat.items || []).map((item, idx) => renderItemRow(item, idx, cat)).join('')}
         </div>
       `).join('');
+    }
+
+    function renderItemRow(item, idx, cat) {
+      return `
+        <div id="erow-${esc(item.id)}" oninput="markItemDirty('${esc(item.id)}')" style="border:1px solid #eee;border-radius:8px;padding:10px;margin-bottom:6px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span style="font-size:13px;font-weight:600">${esc(item.name)}</span>
+            <span style="display:flex;gap:4px">
+              <button onclick="moveItem('${esc(cat.id)}','${esc(item.id)}',-1)" style="padding:2px 7px;font-size:13px;border:1px solid #ddd;border-radius:4px;background:#fafafa;cursor:pointer" ${idx===0?'disabled':''}>↑</button>
+              <button onclick="moveItem('${esc(cat.id)}','${esc(item.id)}',1)"  style="padding:2px 7px;font-size:13px;border:1px solid #ddd;border-radius:4px;background:#fafafa;cursor:pointer" ${idx===cat.items.length-1?'disabled':''}>↓</button>
+            </span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+            <label style="font-size:12px;opacity:.6">Цена (₽)
+              <input id="ep-${esc(item.id)}" type="number" step="1" value="${esc(item.price ?? '')}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+            </label>
+            <label style="font-size:12px;opacity:.6">В наличии
+              <select id="es-${esc(item.id)}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+                <option value="true"  ${item.in_stock!==false?'selected':''}>Есть</option>
+                <option value="false" ${item.in_stock===false?'selected':''}>Нет</option>
+              </select>
+            </label>
+            <label style="font-size:12px;opacity:.6">Заголовок (title)
+              <input id="et-${esc(item.id)}" value="${esc(item.title||'')}" placeholder="${esc(item.name)}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+            </label>
+            <label style="font-size:12px;opacity:.6">Подзаголовок (subtitle)
+              <input id="eu-${esc(item.id)}" value="${esc(item.subtitle||'')}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+            </label>
+          </div>
+          <button onclick="saveItem('${esc(item.id)}')" style="padding:6px 16px;border:none;border-radius:6px;background:#3390ec;color:#fff;font-size:13px;cursor:pointer">Сохранить</button>
+          <button onclick="reloadItem('${esc(item.id)}')" style="padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer;margin-left:6px">Перезагрузить с сервера</button>
+          <span id="emsg-${esc(item.id)}" style="font-size:12px;margin-left:8px;opacity:.6"></span>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <img id="ethumb-${esc(item.id)}" src="${esc(item.image||'')}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #eee;${item.image?'':'display:none'}">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              <input id="efile-${esc(item.id)}" type="file" accept="image/jpeg,image/png,image/webp" style="font-size:12px;max-width:180px">
+              <button onclick="uploadImage('${esc(item.id)}')" style="padding:5px 12px;border:none;border-radius:6px;background:#555;color:#fff;font-size:12px;cursor:pointer">Загрузить фото</button>
+              <button id="edelete-${esc(item.id)}" onclick="deleteImage('${esc(item.id)}')" style="padding:5px 12px;border:none;border-radius:6px;background:#e74c3c;color:#fff;font-size:12px;cursor:pointer;${(item.image||'').startsWith('/uploads/items/')?'':'display:none'}">Удалить фото</button>
+              <span id="eimgmsg-${esc(item.id)}" style="font-size:12px;opacity:.6"></span>
+            </div>
+          </div>
+        </div>
+      `;
     }
 
     async function saveItem(itemId) {
@@ -420,7 +425,7 @@
       body.title    = title;
       body.subtitle = subtitle;
       const msgEl = document.getElementById(`emsg-${itemId}`);
-      if (msgEl) msgEl.textContent = '…';
+      if (msgEl) { msgEl.textContent = '…'; msgEl.style.cssText = 'font-size:12px;margin-left:8px;opacity:.6'; }
       const r = await fetch(`${base()}/api/admin/catalog/items/${itemId}`, {
         method: 'PATCH',
         headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
@@ -468,6 +473,7 @@
     }
 
     async function deleteImage(itemId) {
+      if (!confirm('Удалить фото товара? Это действие нельзя отменить.')) return;
       clearEditorError();
       const { value: token, error: tokenError } = sanitizeToken(tok());
       if (tokenError) { showEditorError(tokenError); return; }
@@ -571,11 +577,16 @@
         </div>
         <div id="wtb-points"></div>
       `;
-      body.addEventListener('input', () => { wtbDirty = true; }, { once: true });
+      body.oninput = () => {
+        if (!wtbDirty) { wtbDirty = true; }
+        const m = document.getElementById('wtb-msg');
+        if (m) { m.textContent = 'Есть несохранённые изменения'; m.style.cssText = 'font-size:12px;margin-left:8px;color:#92400e;font-weight:600;opacity:1'; }
+      };
       body.innerHTML += `
         <button onclick="wtbAddPoint()" style="margin:8px 0;padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer">+ Добавить точку</button>
         <div style="margin-top:12px">
           <button onclick="saveWtb()" style="padding:6px 16px;border:none;border-radius:6px;background:#3390ec;color:#fff;font-size:13px;cursor:pointer">Сохранить</button>
+          <button onclick="reloadWtb()" style="padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer;margin-left:6px">Перезагрузить с сервера</button>
           <span id="wtb-msg" style="font-size:12px;margin-left:8px;opacity:.6"></span>
         </div>
       `;
@@ -608,7 +619,7 @@
         note:     document.getElementById(`wo-${i}`)?.value ?? '',
       }));
       const msg = document.getElementById('wtb-msg');
-      if (msg) msg.textContent = '…';
+      if (msg) { msg.textContent = '…'; msg.style.cssText = 'font-size:12px;margin-left:8px;opacity:.6'; }
       const r = await fetch(`${base()}/api/admin/content/where-to-buy`, {
         method: 'PUT',
         headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
@@ -703,10 +714,15 @@
         </div>
         <div style="margin-top:12px">
           <button onclick="saveFb()" style="padding:6px 16px;border:none;border-radius:6px;background:#3390ec;color:#fff;font-size:13px;cursor:pointer">Сохранить</button>
+          <button onclick="reloadFb()" style="padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer;margin-left:6px">Перезагрузить с сервера</button>
           <span id="fb-msg" style="font-size:12px;margin-left:8px;opacity:.6"></span>
         </div>
       `;
-      body.addEventListener('input', () => { fbDirty = true; }, { once: true });
+      body.oninput = () => {
+        if (!fbDirty) { fbDirty = true; }
+        const m = document.getElementById('fb-msg');
+        if (m) { m.textContent = 'Есть несохранённые изменения'; m.style.cssText = 'font-size:12px;margin-left:8px;color:#92400e;font-weight:600;opacity:1'; }
+      };
     }
 
     function splitLines(id) {
@@ -734,7 +750,7 @@
         secondary_cta_value: document.getElementById('fb-sec-value')?.value ?? '',
       };
       const msg = document.getElementById('fb-msg');
-      if (msg) msg.textContent = '…';
+      if (msg) { msg.textContent = '…'; msg.style.cssText = 'font-size:12px;margin-left:8px;opacity:.6'; }
       const r = await fetch(`${base()}/api/admin/content/for-business`, {
         method: 'PUT',
         headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
@@ -744,6 +760,66 @@
       if (!r.ok) { document.getElementById('fb-error').textContent = await parseError(r); if (msg) msg.textContent = ''; return; }
       if (msg) { msg.textContent = '✓ Сохранено'; setTimeout(() => { msg.textContent = ''; }, 2000); }
       fbDirty = false;
+    }
+
+    function markItemDirty(itemId) {
+      const msgEl = document.getElementById(`emsg-${itemId}`);
+      if (!msgEl) return;
+      if (msgEl.textContent !== 'Есть несохранённые изменения') {
+        msgEl.textContent = 'Есть несохранённые изменения';
+        msgEl.style.cssText = 'font-size:12px;margin-left:8px;color:#92400e;font-weight:600;opacity:1';
+      }
+    }
+
+    async function reloadItem(itemId) {
+      clearEditorError();
+      const r = await fetch(`${base()}/api/catalog`)
+        .catch(() => { showEditorError('Не удалось подключиться.'); return null; });
+      if (!r) return;
+      if (!r.ok) { showEditorError(await parseError(r)); return; }
+      const data = await r.json();
+      let found = false;
+      for (const cat of (data.categories || [])) {
+        const idx = cat.items.findIndex(i => i.id === itemId);
+        if (idx >= 0) {
+          found = true;
+          const item = cat.items[idx];
+          for (const ec of editorCatalog) {
+            const ei = ec.items.findIndex(i => i.id === itemId);
+            if (ei >= 0) { ec.items[ei] = item; break; }
+          }
+          const row = document.getElementById(`erow-${itemId}`);
+          if (row) row.outerHTML = renderItemRow(item, idx, cat);
+          break;
+        }
+      }
+      if (!found) showEditorError('Не удалось перезагрузить товар с сервера.');
+    }
+
+    async function reloadWtb() {
+      const msg = document.getElementById('wtb-msg');
+      if (msg) msg.textContent = '…';
+      const r = await fetch(`${base()}/api/content/where-to-buy`)
+        .catch(() => { document.getElementById('wtb-error').textContent = 'Не удалось подключиться.'; if (msg) msg.textContent = ''; return null; });
+      if (!r) return;
+      if (!r.ok) { document.getElementById('wtb-error').textContent = await parseError(r); if (msg) msg.textContent = ''; return; }
+      const data = await r.json();
+      wtbDirty = false;
+      if (msg) { msg.textContent = ''; msg.style.cssText = 'font-size:12px;margin-left:8px;opacity:.6'; }
+      renderWtb(data);
+    }
+
+    async function reloadFb() {
+      const msg = document.getElementById('fb-msg');
+      if (msg) msg.textContent = '…';
+      const r = await fetch(`${base()}/api/content/for-business`)
+        .catch(() => { document.getElementById('fb-error').textContent = 'Не удалось подключиться.'; if (msg) msg.textContent = ''; return null; });
+      if (!r) return;
+      if (!r.ok) { document.getElementById('fb-error').textContent = await parseError(r); if (msg) msg.textContent = ''; return; }
+      const data = await r.json();
+      fbDirty = false;
+      if (msg) { msg.textContent = ''; msg.style.cssText = 'font-size:12px;margin-left:8px;opacity:.6'; }
+      renderFb(data);
     }
   </script>
 </body>
