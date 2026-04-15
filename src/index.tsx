@@ -17,6 +17,11 @@ type CatalogItem = {
   in_stock?: boolean;
   image?: string;
   category?: string;
+  prepared_item_id?: string;
+  prepared_wait_time?: string;
+  prepared_min_order?: string;
+  prepared_price_text?: string;
+  prepared_note?: string;
 };
 type Category = {
   id: string;
@@ -37,6 +42,18 @@ type Catalog = {
 type CartEntry = { item: CatalogItem; qty: number };
 type WhereToBuyPoint = { city: string; name: string; address: string; schedule?: string; note?: string };
 type WhereToBuyContent = { title: string; description: string; points: WhereToBuyPoint[] };
+type PreparedOnRequestItem = { id: string; name: string; note?: string };
+type PreparedOnRequestContent = {
+  visible: boolean;
+  title: string;
+  subtitle: string;
+  items: PreparedOnRequestItem[];
+  disclaimer: string;
+  cta_text: string;
+  cta_secondary_text: string;
+  cta_secondary_mode: string;
+  cta_secondary_value: string;
+};
 
 
 function tgVar(name: string, fallback: string): string {
@@ -169,7 +186,7 @@ const S = {
     width: "100%", padding: "13px 14px", borderRadius: 12,
     border: `1.5px solid ${tgVar("secondary-bg-color", "#e0e0e0")}`, fontSize: 16,
     background: tgVar("secondary-bg-color", "#f7f7f8"), color: tgVar("text-color", "#1a1a1a"),
-    outline: "none", boxSizing: "border-box" as const, marginBottom: 10,
+    outline: "none", boxSizing: "border-box" as const, marginBottom: 10, fontFamily: "inherit",
   } as React.CSSProperties,
   label: {
     fontSize: 13, fontWeight: 600, opacity: 0.55, marginBottom: 5, display: "block",
@@ -286,15 +303,24 @@ function App() {
   const [error, setError] = useState("");
   const [showWhereToBuy, setShowWhereToBuy] = useState(false);
   const [whereToBuy, setWhereToBuy] = useState<WhereToBuyContent>(DEFAULT_WHERE_TO_BUY);
+  const [preparedOnRequest, setPreparedOnRequest] = useState<PreparedOnRequestContent | null>(null);
+  const [forBusinessEnabled, setForBusinessEnabled] = useState<boolean | null>(null);
+  const [showPreparedForm, setShowPreparedForm] = useState(false);
+  const [porName, setPorName] = useState("");
+  const [porPhone, setPorPhone] = useState("");
+  const [porComment, setPorComment] = useState("");
+  const [porDesiredTime, setPorDesiredTime] = useState("");
+  const [porQtys, setPorQtys] = useState<Record<string, number>>({});
+  const [porSending, setPorSending] = useState(false);
+  const [porResult, setPorResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [showSections, setShowSections] = useState(false);
   const sectionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!showSections) return;
     const handler = (e: MouseEvent) => {
-      if (sectionsRef.current && !sectionsRef.current.contains(e.target as Node)) {
+      if (sectionsRef.current && !sectionsRef.current.contains(e.target as Node))
         setShowSections(false);
-      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -366,6 +392,14 @@ const isScheduledTimeInFuture =
       .then((r) => r.ok ? r.json() : null)
       .then((data: WhereToBuyContent | null) => { if (data) setWhereToBuy(data); })
       .catch(() => {});
+    fetch(`${API_BASE}/api/content/prepared-on-request`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: PreparedOnRequestContent | null) => { setPreparedOnRequest(data?.visible ? data : null); })
+      .catch(() => { setPreparedOnRequest(null); });
+    fetch(`${API_BASE}/api/content/for-business`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: { enabled?: boolean } | null) => { setForBusinessEnabled(data?.enabled ?? false); })
+      .catch(() => { setForBusinessEnabled(false); });
   }, [API_BASE]);
 
   useEffect(() => {
@@ -467,16 +501,26 @@ const isScheduledTimeInFuture =
   const cartTotal = useMemo(() => cartEntries.reduce((s, e) => s + e.item.price * e.qty, 0), [cartEntries]);
   const allCategories = catalog?.categories ?? [];
 
+  const PREPARED_CAT_IDS = ["pelmeni", "manty", "farsh", "shashlik"];
+  const preparedCtaCats = allCategories.filter(cat => PREPARED_CAT_IDS.includes(cat.id));
+  const itemsForCat = (cat: Category) =>
+    PREPARED_CAT_IDS.includes(cat.id)
+      ? cat.items
+      : cat.items.filter(it => !!it.prepared_item_id);
+
+  const [, setPorCategoryId] = useState<string | null>(null);
+  const [porExpandedCats, setPorExpandedCats] = useState<Set<string>>(new Set());
+
   const POPULAR_IDS = ["h1", "p1", "s1", "o2"];
   const popularItems = useMemo(() => {
     if (!catalog) return [];
-    const itemMap = new Map<string, CatalogItem & { catName: string }>();
+    const itemMap = new Map<string, CatalogItem & { catName: string; catId: string }>();
     for (const cat of catalog.categories) {
       for (const item of cat.items) {
-        itemMap.set(item.id, { ...item, category: cat.name, catName: cat.name });
+        itemMap.set(item.id, { ...item, category: cat.name, catName: cat.name, catId: cat.id });
       }
     }
-    return POPULAR_IDS.map(id => itemMap.get(id)).filter(Boolean) as (CatalogItem & { catName: string })[];
+    return POPULAR_IDS.map(id => itemMap.get(id)).filter(Boolean) as (CatalogItem & { catName: string; catId: string })[];
   }, [catalog]);
 
   const IMAGE_POS: Record<string, string> = { o1: "center 70%", k3: "center 35%", p1: "center 30%" };
@@ -651,98 +695,130 @@ window.history.replaceState(null, '', _u.toString());
 }
 
   return (
-    <div style={S.app}>
+    <div style={S.app} className="rp-app">
+      <style>{`
+        .rp-app { max-width: 100%; }
+        @media (min-width: 640px)  { .rp-app { max-width: 760px;  margin: 0 auto; } }
+        @media (min-width: 900px)  { .rp-app { max-width: 980px;  } }
+        @media (min-width: 1280px) { .rp-app { max-width: 1100px; } }
+        .rp-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; margin: 0 auto; }
+        @media (min-width: 900px)  { .rp-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 580px; } }
+        @media (min-width: 900px)  { .rp-sections-btn { display: none; } }
+        .rp-chips { display: none; }
+        @media (min-width: 900px)  { .rp-chips { display: flex; } }
+        .rp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        @media (min-width: 640px)  { .rp-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @media (min-width: 900px)  { .rp-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+        @media (min-width: 640px)  { .rp-bottom { left: 50%; transform: translateX(-50%); width: 760px;  right: auto; } }
+        @media (min-width: 900px)  { .rp-bottom { width: 980px;  } }
+        @media (min-width: 1280px) { .rp-bottom { width: 1100px; } }
+      `}</style>
       {isTest && <div style={{position:'fixed',top:0,left:0,right:0,zIndex:9999,background:'#ff3b30',color:'#fff',fontSize:11,fontWeight:700,textAlign:'center' as const,padding:'3px 0',letterSpacing:'1px'}}>ТЕСТОВЫЙ РЕЖИМ</div>}
+      {freeFrom > 0 && (
+        <div style={{
+          background: "#2d1f0e", color: "#f5e9d6",
+          fontSize: 12, fontWeight: 500, textAlign: "center" as const,
+          padding: "7px 16px", letterSpacing: "0.2px", lineHeight: 1.4,
+        }}>
+          По Саракташу — бесплатно от {freeFrom}₽ · принимаем заказы {workStart}:00–{workEnd}:00
+        </div>
+      )}
       <div style={S.header}>
         <h1 style={S.shopName}>{catalog.shop_name}</h1>
-        {bizPhone && (
-          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-            <a href={`tel:${bizPhone}`} style={{
-              display: "inline-flex", alignItems: "center", gap: 4,
-              padding: "5px 12px", borderRadius: 8,
-              background: tgVar("secondary-bg-color", "#ede8e0"),
-              color: tgVar("text-color", "#1a1a1a"),
-              fontSize: 13, fontWeight: 500, textDecoration: "none",
-            }}>📞 Позвонить</a>
-            <a href="https://max.ru/join/FZnl85uOe410NmUxA0dDMyFYf90-aJkBOweY_tPkUr4" target="_blank" rel="noreferrer" style={{
-              display: "inline-flex", alignItems: "center", gap: 4,
-              padding: "5px 12px", borderRadius: 8,
-              background: tgVar("secondary-bg-color", "#ede8e0"),
-              color: tgVar("text-color", "#1a1a1a"),
-              fontSize: 13, fontWeight: 500, textDecoration: "none",
-            }}>💬 Чат MAX</a>
-            <button onClick={() => setShowWhereToBuy(true)} style={{
-              display: "inline-flex", alignItems: "center", gap: 4,
-              padding: "5px 12px", borderRadius: 8, border: "none", cursor: "pointer",
-              background: tgVar("secondary-bg-color", "#ede8e0"),
-              color: tgVar("text-color", "#1a1a1a"),
-              fontSize: 13, fontWeight: 500,
-            }}>📍 Где купить</button>
-          </div>
-        )}
-        <div style={{ position: "relative" }} ref={sectionsRef}>
-          <button
-            onClick={() => setShowSections(v => !v)}
-            style={{
-              padding: "8px 16px",
-              borderRadius: 10,
-              border: "none",
-              fontSize: 14,
-              fontWeight: 500,
-              cursor: "pointer",
-              background: tgVar("secondary-bg-color", "#f0f0f0"),
-              color: tgVar("text-color", "#1a1a1a"),
-            }}
-          >
-            ☰ Разделы
-          </button>
-          {showSections && (
-            <div style={{
-              position: "absolute",
-              top: "calc(100% + 6px)",
-              left: 0,
-              right: 0,
-              background: tgVar("bg-color", "#ffffff"),
-              borderRadius: 12,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
-              padding: "6px 0",
-              zIndex: 100,
-              maxWidth: 260,
-            }}>
-              <button
-                onClick={() => scrollToSection("section-popular")}
-                style={{
-                  display: "block", width: "100%", padding: "10px 16px",
-                  border: "none", background: "none", textAlign: "left" as const,
-                  fontSize: 14, cursor: "pointer",
-                  color: tgVar("text-color", "#1a1a1a"),
-                }}
-              >
-                ⭐ Популярное
-              </button>
-              {allCategories.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => scrollToSection(`section-${cat.id}`)}
-                  style={{
-                    display: "block", width: "100%", padding: "10px 16px",
-                    border: "none", background: "none", textAlign: "left" as const,
-                    fontSize: 14, cursor: "pointer",
-                    color: tgVar("text-color", "#1a1a1a"),
-                  }}
-                >
-                  {cat.emoji} {cat.name}
-                </button>
-              ))}
+        <p style={{ margin: "0 0 10px", fontSize: 13, opacity: 0.55, lineHeight: 1.4 }}>
+          Домашние полуфабрикаты ручной лепки
+        </p>
+        {(() => {
+          const btnInner: React.CSSProperties = {
+            display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 8,
+            width: "100%", boxSizing: "border-box", minWidth: 0, overflow: "hidden",
+            padding: "7px 12px", borderRadius: 8, border: "none", cursor: "pointer",
+            minHeight: 44, textDecoration: "none",
+            background: tgVar("secondary-bg-color", "#e2ddd6"),
+            color: tgVar("text-color", "#1a1a1a"),
+            fontSize: 13, fontWeight: 600,
+          };
+          const txt = (s: string) => (
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s}</span>
+          );
+          const ico = (s: string) => (
+            <span style={{ width: 20, textAlign: "center" as const, flexShrink: 0 }}>{s}</span>
+          );
+          return (
+            <div style={{ display: "grid", gap: 8, marginBottom: 10 }} className="rp-nav">
+
+              <div style={{ minWidth: 0, position: "relative" }} ref={sectionsRef} className="rp-sections-btn">
+                <button onClick={() => setShowSections(v => !v)} style={btnInner}>{ico("☰")}{txt("Разделы")}</button>
+                {showSections && (
+                  <div style={{
+                    position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0,
+                    background: tgVar("bg-color", "#ffffff"), borderRadius: 12,
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.12)", padding: "6px 0",
+                    zIndex: 100, maxWidth: 260,
+                  }}>
+                    <button
+                      onClick={() => scrollToSection("section-popular")}
+                      style={{ display: "block", width: "100%", padding: "10px 16px", border: "none", background: "none", textAlign: "left" as const, fontSize: 14, cursor: "pointer", color: tgVar("text-color", "#1a1a1a") }}
+                    >⭐ Популярное</button>
+                    {allCategories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        onClick={() => scrollToSection(`section-${cat.id}`)}
+                        style={{ display: "block", width: "100%", padding: "10px 16px", border: "none", background: "none", textAlign: "left" as const, fontSize: 14, cursor: "pointer", color: tgVar("text-color", "#1a1a1a") }}
+                      >
+                        <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1 }}>
+                          <span>{cat.emoji} {cat.name}</span>
+                          {PREPARED_CAT_IDS.includes(cat.id) && preparedOnRequest && (
+                            <span style={{ fontSize: 11, color: "#9a7a5a", lineHeight: 1.3 }}>можно в готовом виде</span>
+                          )}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ minWidth: 0 }}>
+                <button onClick={() => setShowWhereToBuy(true)} style={btnInner}>{ico("📍")}{txt("Где купить")}</button>
+              </div>
+
+              {bizPhone && (
+                <div style={{ minWidth: 0 }}>
+                  <a href={`tel:${bizPhone}`} style={btnInner}>{ico("📞")}{txt("Позвонить")}</a>
+                </div>
+              )}
+
+              {bizPhone && (
+                <div style={{ minWidth: 0 }}>
+                  <a href="https://max.ru/join/FZnl85uOe410NmUxA0dDMyFYf90-aJkBOweY_tPkUr4" target="_blank" rel="noreferrer" style={btnInner}>{ico("💬")}{txt("Чат MAX")}</a>
+                </div>
+              )}
+
             </div>
-          )}
-        </div>
+          );
+        })()}
+      </div>
+
+      <div style={{ gap: 8, overflowX: "auto", padding: "6px 16px 6px", scrollbarWidth: "none" as const }} className="rp-chips">
+        {popularItems.length > 0 && (
+          <button
+            onClick={() => scrollToSection("section-popular")}
+            style={{ padding: "5px 12px", borderRadius: 20, border: "none", cursor: "pointer", whiteSpace: "nowrap" as const, fontSize: 12, fontWeight: 400, flexShrink: 0, background: tgVar("secondary-bg-color", "#e2ddd6"), color: tgVar("text-color", "#1a1a1a") }}
+          >⭐ Популярное</button>
+        )}
+        {allCategories.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => scrollToSection(`section-${cat.id}`)}
+            style={{ padding: "5px 12px", borderRadius: 20, border: "none", cursor: "pointer", whiteSpace: "nowrap" as const, fontSize: 12, fontWeight: 400, flexShrink: 0, background: tgVar("secondary-bg-color", "#e2ddd6"), color: tgVar("text-color", "#1a1a1a") }}
+          >{cat.emoji} {cat.name}</button>
+        ))}
       </div>
 
       {popularItems.length > 0 && (
         <div id="section-popular" style={S.section}>
-          <div style={S.sectionTitle}>⭐ Популярное</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, margin: "4px 0 14px", letterSpacing: 0 }}>⭐ Популярное</div>
+          <div style={{ display: "grid", gap: 8 }} className="rp-grid">
             {popularItems.map((item) => {
               const inCart = cart[item.id];
               return (
@@ -751,17 +827,25 @@ window.history.replaceState(null, '', _u.toString());
                   borderRadius: 14, background: tgVar("secondary-bg-color", "#f7f7f8"),
                   overflow: "hidden",
                 }}>
-                  {item.image && (
-                    <img src={item.image} alt={item.name} style={{
-                      width: "100%", aspectRatio: "3/2", objectFit: "cover", display: "block",
-                      ...(IMAGE_POS[item.id] && { objectPosition: IMAGE_POS[item.id] }),
-                    }} />
-                  )}
+                  <div style={{ position: "relative" }}>
+                    {item.image && (
+                      <img src={item.image} alt={item.name} style={{
+                        width: "100%", aspectRatio: "3/2", objectFit: "cover", display: "block",
+                        ...(IMAGE_POS[item.id] && { objectPosition: IMAGE_POS[item.id] }),
+                      }} />
+                    )}
+                    {item.prepared_item_id && !PREPARED_CAT_IDS.includes(item.catId) && preparedOnRequest && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setPorCategoryId(item.catId); setPorExpandedCats(new Set([item.catId])); setPorQtys({ [item.id]: 1 }); setPorPhone(phone); setPorResult(null); setShowPreparedForm(true); }}
+                        style={{ position: "absolute", top: 8, left: 8, padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(90,57,35,0.10)", cursor: "pointer", background: "rgba(248,241,232,0.96)", color: "#5a3923", fontSize: 12, fontWeight: 700, lineHeight: 1, boxShadow: "0 2px 8px rgba(0,0,0,0.10)" }}
+                      >Можно готовым</button>
+                    )}
+                  </div>
                   <div style={{ padding: "8px 10px 10px", display: "flex", flexDirection: "column" as const, flex: 1 }}>
                     <div style={{ fontSize: 11, opacity: 0.4, marginBottom: 2, textTransform: "uppercase" as const, letterSpacing: "0.3px" }}>{item.catName}</div>
                     <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3, marginBottom: item.subtitle ? 2 : 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>{item.title ?? item.name}</div>
                     {item.subtitle && <div style={{ fontSize: 12, opacity: 0.5, marginBottom: 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical" as const }}>{item.subtitle}</div>}
-                    <div style={{ fontSize: 14, fontWeight: 600, opacity: 0.55, marginBottom: 8 }}>{item.price}{currency} / {item.unit}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, opacity: 0.75, marginBottom: 8 }}>{item.price}{currency} / {item.unit}</div>
                     <div style={{ marginTop: "auto" }}>
                       {inCart ? (
                         <div style={{ ...S.qtyControls, justifyContent: "center" }}>
@@ -783,13 +867,39 @@ window.history.replaceState(null, '', _u.toString());
         </div>
       )}
 
-      <div style={{ padding: "12px 16px 8px" }}>
+      <div style={{ padding: "4px 16px 10px" }}>
+        <a
+          href="https://yandex.com/profile/90471460683?lang=ru&no-distribution=1&view-state=mini&source=wizbiz_new_map_single"
+          target="_blank" rel="noreferrer"
+          style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, textDecoration: "none" }}
+        >
+          <span style={{ color: "#f5a623", fontSize: 15, lineHeight: 1 }}>★</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: tgVar("text-color", "#1a1a1a") }}>4,5</span>
+          <span style={{ fontSize: 13, opacity: 0.5, color: tgVar("text-color", "#1a1a1a") }}>· 10 отзывов на Яндекс Картах</span>
+          <span style={{ fontSize: 13, opacity: 0.4, color: tgVar("text-color", "#1a1a1a") }}>→</span>
+        </a>
+        {([
+          { text: "Римские пельмени, манты — просто класс, по-домашнему. Всегда свежие, всем советую. Бесплатная доставка — большой плюс!", name: "Светлана Г." },
+          { text: "Хорошее качество, очень вкусные, тесто не разваривается. Были очень довольны, рекомендую, пельмени супер.", name: "Сергей К." },
+          { text: "Заказали пельмени, вареники и котлеты. Я просто в восторге! Держите марку также хорошо.", name: "Арсений К." },
+        ] as const).map(({ text, name }) => (
+          <div key={name} style={{
+            background: tgVar("secondary-bg-color", "#f7f5f2"),
+            borderRadius: 12, padding: "10px 12px", marginBottom: 8,
+          }}>
+            <div style={{ fontSize: 13, lineHeight: 1.5, marginBottom: 4 }}>«{text}»</div>
+            <div style={{ fontSize: 12, opacity: 0.45 }}>— {name}</div>
+          </div>
+        ))}
+      </div>
+
+      {forBusinessEnabled && <div style={{ padding: "12px 16px 8px" }}>
         <a href="business.html" style={{
           display: "block", padding: "14px", borderRadius: 16,
-          background: "#faf7f0", border: "1px solid rgba(0,0,0,.08)",
+          background: "#faf7f0", border: "1px solid rgba(0,0,0,.12)",
           textDecoration: "none", color: "#1a1a1a",
         }}>
-          <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.25, marginBottom: 4 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.25, marginBottom: 6 }}>
             У вас магазин или точка?
           </div>
           <div style={{ fontSize: 13, opacity: 0.78, lineHeight: 1.35, marginBottom: 10 }}>
@@ -798,17 +908,25 @@ window.history.replaceState(null, '', _u.toString());
           </div>
           <div style={{
             display: "inline-block", fontSize: 13, fontWeight: 600,
-            padding: "8px 10px", borderRadius: 12, background: "rgba(0,0,0,.06)",
+            padding: "8px 14px", borderRadius: 20, background: "rgba(0,0,0,.08)",
           }}>
             Подробнее →
           </div>
         </a>
-      </div>
+      </div>}
 
       {allCategories.map((cat) => (
         <div key={cat.id} id={`section-${cat.id}`} style={S.section}>
-          <div style={S.sectionTitle}>{cat.emoji} {cat.name}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div style={{ ...S.sectionTitle, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const }}>
+            <span>{cat.emoji} {cat.name}</span>
+            {preparedCtaCats.some(pc => pc.id === cat.id) && preparedOnRequest && (
+              <button
+                onClick={() => { setPorCategoryId(cat.id); setPorExpandedCats(new Set([cat.id])); setPorQtys({}); setPorPhone(phone); setPorResult(null); setShowPreparedForm(true); }}
+                style={{ fontSize: 12, fontWeight: 600, padding: "5px 11px", borderRadius: 20, border: "none", cursor: "pointer", background: tgVar("secondary-bg-color", "#ede8e0"), color: tgVar("text-color", "#1a1a1a"), whiteSpace: "nowrap" as const }}
+              >Заказать готовым</button>
+            )}
+          </div>
+          <div style={{ display: "grid", gap: 8 }} className="rp-grid">
             {cat.items.map((item) => {
               const inCart = cart[item.id];
               return (
@@ -817,20 +935,28 @@ window.history.replaceState(null, '', _u.toString());
                   borderRadius: 14, background: tgVar("secondary-bg-color", "#f7f7f8"),
                   overflow: "hidden",
                 }}>
-                  {item.image ? (
-                    <img src={item.image} alt={item.name} style={{
-                      width: "100%", aspectRatio: "3/2", objectFit: "cover", display: "block",
-                      ...(IMAGE_POS[item.id] && { objectPosition: IMAGE_POS[item.id] }),
-                    }} />
-                  ) : (
-                    <div style={{
-                      width: "100%", aspectRatio: "3/2", display: "flex",
-                      alignItems: "center", justifyContent: "center",
-                      background: "#f0ebe3", color: "#b0a898", fontSize: 11,
-                    }}>
-                      Фото скоро появится
-                    </div>
-                  )}
+                  <div style={{ position: "relative" }}>
+                    {item.image ? (
+                      <img src={item.image} alt={item.name} style={{
+                        width: "100%", aspectRatio: "3/2", objectFit: "cover", display: "block",
+                        ...(IMAGE_POS[item.id] && { objectPosition: IMAGE_POS[item.id] }),
+                      }} />
+                    ) : (
+                      <div style={{
+                        width: "100%", aspectRatio: "3/2", display: "flex",
+                        alignItems: "center", justifyContent: "center",
+                        background: "#f0ebe3", color: "#b0a898", fontSize: 11,
+                      }}>
+                        Фото скоро появится
+                      </div>
+                    )}
+                    {item.prepared_item_id && !PREPARED_CAT_IDS.includes(cat.id) && preparedOnRequest && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setPorCategoryId(cat.id); setPorExpandedCats(new Set([cat.id])); setPorQtys({ [item.id]: 1 }); setPorPhone(phone); setPorResult(null); setShowPreparedForm(true); }}
+                        style={{ position: "absolute", top: 8, left: 8, padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(90,57,35,0.10)", cursor: "pointer", background: "rgba(248,241,232,0.96)", color: "#5a3923", fontSize: 12, fontWeight: 700, lineHeight: 1, boxShadow: "0 2px 8px rgba(0,0,0,0.10)" }}
+                      >Можно готовым</button>
+                    )}
+                  </div>
                   <div style={{ padding: "8px 10px 10px", display: "flex", flexDirection: "column" as const, flex: 1 }}>
                     <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3, marginBottom: item.subtitle ? 2 : 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>{item.title ?? item.name}</div>
                     {item.subtitle && <div style={{ fontSize: 12, opacity: 0.5, marginBottom: 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical" as const }}>{item.subtitle}</div>}
@@ -856,6 +982,45 @@ window.history.replaceState(null, '', _u.toString());
         </div>
       ))}
 
+      {preparedOnRequest && (
+        <div style={{ padding: "8px 16px 12px" }}>
+          <div style={{
+            borderRadius: 16, background: "#faf7f0", border: "1px solid rgba(0,0,0,.08)",
+            padding: "16px",
+          }}>
+            <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.25, marginBottom: 6 }}>
+              {preparedOnRequest.title}
+            </div>
+            <div style={{ fontSize: 13, opacity: 0.75, lineHeight: 1.45, marginBottom: 14 }}>
+              {preparedOnRequest.subtitle}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => { setPorCategoryId(null); setPorExpandedCats(new Set(preparedCtaCats.map(c => c.id))); setPorQtys({}); setPorPhone(phone); setPorResult(null); setShowPreparedForm(true); }} style={{
+                flex: 1, padding: "11px 0", borderRadius: 12, border: "none",
+                background: tgVar("button-color", "#3390ec"), color: tgVar("button-text-color", "#fff"),
+                fontSize: 14, fontWeight: 600, cursor: "pointer",
+              }}>
+                {preparedOnRequest.cta_text || "Оставить заявку"}
+              </button>
+              {preparedOnRequest.cta_secondary_text && preparedOnRequest.cta_secondary_value && (
+                <a
+                  href={preparedOnRequest.cta_secondary_mode === "phone" ? `tel:${preparedOnRequest.cta_secondary_value}` : preparedOnRequest.cta_secondary_value}
+                  {...(preparedOnRequest.cta_secondary_mode === "link" ? { target: "_blank", rel: "noreferrer" } : {})}
+                  style={{
+                    flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+                    padding: "11px 0", borderRadius: 12,
+                    background: tgVar("secondary-bg-color", "#ede8e0"), color: tgVar("text-color", "#1a1a1a"),
+                    fontSize: 14, fontWeight: 600, textDecoration: "none",
+                  }}
+                >
+                  {preparedOnRequest.cta_secondary_text}
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ padding: "16px 16px 24px", textAlign: "center" as const }}>
         <a href="business.html" style={{
           fontSize: 12, opacity: 0.35,
@@ -865,7 +1030,7 @@ window.history.replaceState(null, '', _u.toString());
       </div>
 
       {cartCount > 0 && !showCart && (
-        <div style={S.bottomBar}>
+        <div style={S.bottomBar} className="rp-bottom">
           <button style={S.mainButton(false)} onClick={() => {
             fetch(`${API_BASE}/api/track/cart_open?tg_user_id=${tgUserId || 0}${testQ}&channel=${channel}&user_key=${encodeURIComponent(userKey)}`, { method: "POST" }).catch(() => {});
             setShowCart(true);
@@ -915,6 +1080,201 @@ window.history.replaceState(null, '', _u.toString());
               fontSize: 14, fontWeight: 600, textDecoration: "none",
             }}>💬 Написать в MAX</a>
           </div>
+        </div>
+      )}
+
+      {showPreparedForm && preparedOnRequest && (
+        <div style={S.overlay}>
+          <div style={S.overlayHeader}>
+            <span style={S.overlayTitle}>Можно заказать в готовом виде</span>
+            <button style={S.closeBtn} onClick={() => { setShowPreparedForm(false); setPorResult(null); setPorCategoryId(null); }}>×</button>
+          </div>
+          <div style={{ fontSize: 13, opacity: 0.5, marginBottom: 16, marginTop: -4 }}>Выберите, что приготовить</div>
+          {porResult ? (
+            <div style={{ padding: "20px 0", textAlign: "center" as const }}>
+              <div style={{ fontSize: 22, marginBottom: 12 }}>{porResult.ok ? "✓" : "✗"}</div>
+              <div style={{ fontSize: 15, lineHeight: 1.5, color: porResult.ok ? "#1a6e2e" : "#c0392b" }}>
+                {porResult.text}
+              </div>
+              {porResult.ok && (
+                <button
+                  onClick={() => { setShowPreparedForm(false); setPorResult(null); setPorCategoryId(null); }}
+                  style={{
+                    marginTop: 20, padding: "11px 28px", borderRadius: 12, border: "none",
+                    background: tgVar("secondary-bg-color", "#ede8e0"), color: tgVar("text-color", "#1a1a1a"),
+                    fontSize: 14, fontWeight: 600, cursor: "pointer",
+                  }}
+                >Закрыть</button>
+              )}
+            </div>
+          ) : (
+            <>
+              {(() => {
+                const overlayCats = allCategories.filter(cat => itemsForCat(cat).length > 0);
+                if (overlayCats.length === 0) return null;
+                return (
+                  <div style={{ marginBottom: 16 }}>
+                    {overlayCats.map(cat => {
+                      const catItems = itemsForCat(cat);
+                      const isExpanded = porExpandedCats.has(cat.id);
+                      const showToggle = overlayCats.length > 1;
+                      return (
+                        <div key={cat.id} style={{ marginBottom: showToggle ? 6 : 0 }}>
+                          {showToggle && (
+                            <button
+                              onClick={() => setPorExpandedCats(s => { const n = new Set(s); n.has(cat.id) ? n.delete(cat.id) : n.add(cat.id); return n; })}
+                              style={{ width: "100%", textAlign: "left" as const, padding: "8px 12px", marginBottom: 4, border: "none", cursor: "pointer", background: tgVar("secondary-bg-color", "#e8e2d9"), borderRadius: 10, fontSize: 14, fontWeight: 700, color: tgVar("text-color", "#1a1a1a"), display: "flex", justifyContent: "space-between" as const, alignItems: "center" }}
+                            >
+                              <span>{cat.emoji} {cat.name}</span>
+                              <span style={{ fontSize: 11 }}>{isExpanded ? "▾" : "▸"}</span>
+                            </button>
+                          )}
+                          {(isExpanded || !showToggle) && (() => {
+                            const mostCommon = (vals: (string | undefined)[]) => { const freq: Record<string, number> = {}; for (const v of vals) if (v) freq[v] = (freq[v] ?? 0) + 1; return Object.keys(freq).sort((a, b) => freq[b] - freq[a])[0] ?? null; };
+                            const sharedWaitTime = mostCommon(catItems.map(it => it.prepared_wait_time));
+                            const sharedMinOrder = mostCommon(catItems.map(it => it.prepared_min_order));
+                            const sharedPriceText = mostCommon(catItems.map(it => it.prepared_price_text));
+                            const priceLabel = (v: string) => v === "уточняется при подтверждении" ? "Цену уточним при подтверждении" : `Цена: ${v}`;
+                            return (
+                              <>
+                                {cat.id === "shashlik" && (
+                                  <div style={{ fontSize: 12, opacity: 0.5, marginBottom: 4, lineHeight: 1.4, paddingLeft: 2 }}>
+                                    Готовим жареный шашлык — не маринованный.
+                                  </div>
+                                )}
+                                {(sharedWaitTime || sharedMinOrder || sharedPriceText) && (
+                                  <div style={{ fontSize: 12, opacity: 0.68, lineHeight: 1.45, marginBottom: 6, paddingLeft: 2 }}>
+                                    {sharedWaitTime && <div>Время приготовления: {sharedWaitTime}</div>}
+                                    {sharedMinOrder && <div>Минимальный заказ: {sharedMinOrder}</div>}
+                                    {sharedPriceText && <div>{priceLabel(sharedPriceText)}</div>}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                          {(isExpanded || !showToggle) && catItems.map(item => {
+                            const mostCommon = (vals: (string | undefined)[]) => { const freq: Record<string, number> = {}; for (const v of vals) if (v) freq[v] = (freq[v] ?? 0) + 1; return Object.keys(freq).sort((a, b) => freq[b] - freq[a])[0] ?? null; };
+                            const sharedWaitTime = mostCommon(catItems.map(it => it.prepared_wait_time));
+                            const sharedMinOrder = mostCommon(catItems.map(it => it.prepared_min_order));
+                            const sharedPriceText = mostCommon(catItems.map(it => it.prepared_price_text));
+                            const priceLabel = (v: string) => v === "уточняется при подтверждении" ? "Цену уточним при подтверждении" : `Цена: ${v}`;
+                            const qty = porQtys[item.id] ?? 0;
+                            return (
+                              <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 12px", borderRadius: 10, background: tgVar("secondary-bg-color", "#f0ebe3"), marginBottom: 6 }}>
+                                <div>
+                                  <div style={{ fontSize: 14, fontWeight: 600 }}>{item.title ?? item.name}</div>
+                                  {item.subtitle && <div style={{ fontSize: 12, opacity: 0.60, marginTop: 1 }}>{item.subtitle}</div>}
+                                  {item.prepared_wait_time && item.prepared_wait_time !== sharedWaitTime && <div style={{ fontSize: 11, opacity: 0.56, lineHeight: 1.35, marginTop: 2 }}>Время: {item.prepared_wait_time}</div>}
+                                  {item.prepared_min_order && item.prepared_min_order !== sharedMinOrder && <div style={{ fontSize: 11, opacity: 0.56, lineHeight: 1.35, marginTop: 1 }}>Минимум: {item.prepared_min_order}</div>}
+                                  {item.prepared_price_text && item.prepared_price_text !== sharedPriceText && <div style={{ fontSize: 11, opacity: 0.56, lineHeight: 1.35, marginTop: 1 }}>{priceLabel(item.prepared_price_text)}</div>}
+                                  {item.prepared_note && <div style={{ fontSize: 11, opacity: 0.56, lineHeight: 1.35, marginTop: 1 }}>{item.prepared_note}</div>}
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  <button onClick={() => setPorQtys(q => ({ ...q, [item.id]: Math.max(0, (q[item.id] ?? 0) - 1) }))} style={{ ...S.qtyBtn, width: 28, height: 28, fontSize: 16 }}>−</button>
+                                  <span style={{ ...S.qtyText, width: 28, fontSize: 14, textAlign: "center" as const }}>{qty}</span>
+                                  <button onClick={() => setPorQtys(q => ({ ...q, [item.id]: (q[item.id] ?? 0) + 1 }))} style={{ ...S.qtyBtn, width: 28, height: 28, fontSize: 16 }}>+</button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, opacity: 0.45, textTransform: "uppercase" as const, letterSpacing: "0.5px", marginBottom: 6 }}>Контакт</div>
+                <input
+                  type="text"
+                  placeholder="Имя"
+                  value={porName}
+                  onChange={(e) => setPorName(e.target.value)}
+                  style={{ ...S.input, marginBottom: 8 }}
+                />
+                <input
+                  type="tel"
+                  placeholder="Телефон"
+                  value={porPhone}
+                  onChange={(e) => setPorPhone(e.target.value)}
+                  style={S.input}
+                />
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, opacity: 0.45, textTransform: "uppercase" as const, letterSpacing: "0.5px", marginBottom: 6 }}>Когда нужно</div>
+                <input
+                  type="text"
+                  placeholder="Например: 20 мая, к 18:00"
+                  value={porDesiredTime}
+                  onChange={(e) => setPorDesiredTime(e.target.value)}
+                  style={S.input}
+                />
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, opacity: 0.45, textTransform: "uppercase" as const, letterSpacing: "0.5px", marginBottom: 6 }}>Комментарий</div>
+                <textarea
+                  placeholder="Дополнительные пожелания"
+                  value={porComment}
+                  onChange={(e) => setPorComment(e.target.value)}
+                  rows={3}
+                  style={{ ...S.input, resize: "none" as const, height: "auto" }}
+                />
+              </div>
+              {preparedOnRequest.disclaimer && (
+                <div style={{ fontSize: 12, opacity: 0.5, lineHeight: 1.5, marginBottom: 16, whiteSpace: "pre-line" as const }}>
+                  {preparedOnRequest.disclaimer}
+                </div>
+              )}
+              {(() => {
+                const overlayCats2 = allCategories.filter(cat => itemsForCat(cat).length > 0);
+                const porCanSubmit = !!porName.trim() && !!porPhone.trim() &&
+                  (overlayCats2.length === 0 || overlayCats2.some(cat => itemsForCat(cat).some(it => (porQtys[it.id] ?? 0) > 0)));
+                return (
+              <button
+                disabled={!porCanSubmit || porSending}
+                onClick={async () => {
+                  setPorSending(true);
+                  try {
+                    const overlayCats3 = allCategories.filter(cat => itemsForCat(cat).length > 0);
+                    const selectedItems = overlayCats3.flatMap(cat =>
+                      itemsForCat(cat)
+                        .filter(it => (porQtys[it.id] ?? 0) > 0)
+                        .map(it => ({ id: it.id, name: it.title ?? it.name, qty: porQtys[it.id] }))
+                    );
+                    const resp = await fetch(`${API_BASE}/api/prepared-requests`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        name: porName.trim(),
+                        phone: porPhone.trim(),
+                        comment: porComment.trim(),
+                        desired_time: porDesiredTime.trim(),
+                        items: selectedItems,
+                        channel,
+                        user_key: userKey,
+                      }),
+                    });
+                    if (resp.ok) {
+                      setPorResult({ ok: true, text: "Заявка отправлена. Мы свяжемся с вами в ближайшее время." });
+                      setPorName(""); setPorPhone(""); setPorComment(""); setPorDesiredTime(""); setPorQtys({});
+                    } else {
+                      const err = await resp.json().catch(() => ({}));
+                      setPorResult({ ok: false, text: err.detail || "Не удалось отправить заявку. Попробуйте ещё раз." });
+                    }
+                  } catch {
+                    setPorResult({ ok: false, text: "Ошибка соединения. Проверьте интернет и попробуйте снова." });
+                  } finally {
+                    setPorSending(false);
+                  }
+                }}
+                style={S.mainButton(!porCanSubmit || porSending)}
+              >
+                {porSending ? "Отправка..." : (preparedOnRequest.cta_text || "Отправить заявку")}
+              </button>
+                );
+              })()}
+            </>
+          )}
         </div>
       )}
 
@@ -1031,7 +1391,7 @@ window.history.replaceState(null, '', _u.toString());
 
               {result && <div ref={resultRef} style={S.resultBox(result.ok)}>{result.text}</div>}
 
-              <div style={{ ...S.bottomBar, position: "fixed" as const }}>
+              <div style={{ ...S.bottomBar, position: "fixed" as const }} className="rp-bottom">
                 <button
                   style={S.mainButton(
                     sending ||
