@@ -573,17 +573,14 @@
           <div style="padding-top:8px;margin-top:4px;border-top:1px solid #f0f0f0;margin-bottom:6px">
             <div style="font-size:11px;font-weight:600;opacity:.45;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Для заказа в готовом виде</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-              <label style="font-size:11px;opacity:.5">Время приготовления
-                <input id="epwt-${esc(item.id)}" value="${esc(item.prepared_wait_time||'')}" placeholder="напр. 30–40 минут" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #eee;border-radius:6px;font-size:12px;box-sizing:border-box">
+              <label style="font-size:12px;opacity:.5">Время приготовления
+                <input id="epwt-${esc(item.id)}" value="${esc(item.prepared_wait_time||'')}" placeholder="напр. 30–40 минут" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #eee;border-radius:6px;font-size:13px;box-sizing:border-box">
               </label>
-              <label style="font-size:11px;opacity:.5">Минимальный заказ
-                <input id="epmo-${esc(item.id)}" value="${esc(item.prepared_min_order||'')}" placeholder="напр. от 1 кг" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #eee;border-radius:6px;font-size:12px;box-sizing:border-box">
+              <label style="font-size:12px;opacity:.5">Цена в готовом виде
+                <input id="eppt-${esc(item.id)}" value="${esc(item.prepared_price_text||'')}" placeholder="напр. уточняется" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #eee;border-radius:6px;font-size:13px;box-sizing:border-box">
               </label>
-              <label style="font-size:11px;opacity:.5">Цена в готовом виде
-                <input id="eppt-${esc(item.id)}" value="${esc(item.prepared_price_text||'')}" placeholder="напр. уточняется" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #eee;border-radius:6px;font-size:12px;box-sizing:border-box">
-              </label>
-              <label style="font-size:11px;opacity:.5">Примечание к позиции
-                <input id="epn-${esc(item.id)}" value="${esc(item.prepared_note||'')}" placeholder="доп. условия" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #eee;border-radius:6px;font-size:12px;box-sizing:border-box">
+              <label style="font-size:12px;opacity:.5">Примечание к позиции
+                <input id="epn-${esc(item.id)}" value="${esc(item.prepared_note||'')}" placeholder="доп. условия" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #eee;border-radius:6px;font-size:13px;box-sizing:border-box">
               </label>
             </div>
           </div>
@@ -615,7 +612,6 @@
       const title             = document.getElementById(`et-${itemId}`)?.value ?? '';
       const subtitle          = document.getElementById(`eu-${itemId}`)?.value ?? '';
       const prepared_wait_time  = document.getElementById(`epwt-${itemId}`)?.value ?? '';
-      const prepared_min_order  = document.getElementById(`epmo-${itemId}`)?.value ?? '';
       const prepared_price_text = document.getElementById(`eppt-${itemId}`)?.value ?? '';
       const prepared_note       = document.getElementById(`epn-${itemId}`)?.value ?? '';
       const body = { in_stock };
@@ -623,7 +619,6 @@
       body.title             = title;
       body.subtitle          = subtitle;
       body.prepared_wait_time  = prepared_wait_time;
-      body.prepared_min_order  = prepared_min_order;
       body.prepared_price_text = prepared_price_text;
       body.prepared_note       = prepared_note;
       const msgEl = document.getElementById(`emsg-${itemId}`);
