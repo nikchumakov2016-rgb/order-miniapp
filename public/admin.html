@@ -16,6 +16,8 @@
     .error { color: #c0392b; margin: 8px 0; font-size: 14px; }
     .toggle { background: #eee; color: #555; white-space: nowrap; flex-shrink: 0; }
     .stats-mobile { display: none; }
+    details.has-dirty > summary { color: #92400e; font-weight: 700; }
+    details.has-dirty > summary::after { content: ' ●'; font-size: 10px; vertical-align: middle; }
     @media (max-width: 640px) {
       .stats-desktop { display: none !important; }
       .stats-mobile { display: block !important; }
@@ -32,10 +34,32 @@
     <button onclick="load()">Загрузить</button>
   </div>
   <div id="error" class="error"></div>
-  <details id="stats-details" style="margin:8px 0;display:none">
-    <summary style="cursor:pointer;font-size:15px;font-weight:600;padding:8px 0">Статистика</summary>
-    <div id="stats-v2"></div>
-  </details>
+  <div id="jump-nav" style="display:none;margin:8px 0 16px;gap:8px;flex-wrap:wrap">
+    <a href="#orders-section" style="font-size:12px;padding:4px 10px;background:#eee;border-radius:6px;text-decoration:none;color:#333">Заказы</a>
+    <a href="#stock" style="font-size:12px;padding:4px 10px;background:#eee;border-radius:6px;text-decoration:none;color:#333">Наличие</a>
+    <a href="#editor-details" style="font-size:12px;padding:4px 10px;background:#eee;border-radius:6px;text-decoration:none;color:#333">Редактор</a>
+    <a href="#storefront-section" style="font-size:12px;padding:4px 10px;background:#eee;border-radius:6px;text-decoration:none;color:#333">Витрина</a>
+    <a href="#stats-details" style="font-size:12px;padding:4px 10px;background:#eee;border-radius:6px;text-decoration:none;color:#333">Статистика</a>
+  </div>
+  <div id="orders-section" style="display:none;margin-bottom:24px">
+    <div style="font-size:15px;font-weight:700;opacity:.75;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Заказы и заявки</div>
+    <div id="prepared-section" style="display:none;margin-bottom:16px;border:2px solid #f0a830;border-radius:8px;padding:12px 14px;background:#fffbf3">
+      <div id="prepared-section-title" style="font-size:15px;font-weight:700;margin-bottom:8px">Заявки на готовый вид</div>
+      <div id="prepared-orders"></div>
+    </div>
+    <div id="orders-active-section" style="display:none;margin-bottom:16px;border:2px solid #ddd;border-radius:8px;padding:12px 14px;background:#fafafa">
+      <div id="orders-active-title" style="font-size:15px;font-weight:700;margin-bottom:8px">Обычные заказы</div>
+      <div id="orders-active"></div>
+    </div>
+    <details id="prepared-closed-details" style="display:none;margin-bottom:8px">
+      <summary style="cursor:pointer;font-size:14px;color:#888;padding:4px 0">Завершённые заявки</summary>
+      <div id="prepared-orders-closed" style="margin-top:8px"></div>
+    </details>
+    <details id="orders-closed-details" style="display:none;margin-top:8px">
+      <summary style="cursor:pointer;font-size:14px;color:#888;padding:4px 0">Завершённые заказы</summary>
+      <div id="orders-closed" style="margin-top:8px"></div>
+    </details>
+  </div>
   <div id="stock"></div>
   <div id="stock-error" class="error"></div>
   <details id="editor-details" style="margin:8px 0;display:none">
@@ -43,17 +67,28 @@
     <div id="editor-error" class="error"></div>
     <div id="editor"></div>
   </details>
-  <details id="wtb-details" style="margin:8px 0;display:none">
-    <summary style="cursor:pointer;font-size:15px;font-weight:600;padding:8px 0">Где купить</summary>
-    <div id="wtb-error" class="error"></div>
-    <div id="wtb-body"></div>
+  <div id="storefront-section" style="display:none;margin-top:20px;border-top:2px solid #eee;padding-top:12px">
+    <div style="font-size:15px;font-weight:700;opacity:.75;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Витринный контент</div>
+    <details id="wtb-details" style="margin:8px 0;display:none">
+      <summary style="cursor:pointer;font-size:15px;font-weight:600;padding:8px 0">Где купить</summary>
+      <div id="wtb-error" class="error"></div>
+      <div id="wtb-body"></div>
+    </details>
+    <details id="fb-details" style="margin:8px 0;display:none">
+      <summary style="cursor:pointer;font-size:15px;font-weight:600;padding:8px 0">Для бизнеса</summary>
+      <div id="fb-error" class="error"></div>
+      <div id="fb-body"></div>
+    </details>
+    <details id="por-details" style="margin:8px 0;display:none">
+      <summary style="cursor:pointer;font-size:15px;font-weight:600;padding:8px 0">Можно заказать в готовом виде</summary>
+      <div id="por-error" class="error"></div>
+      <div id="por-body"></div>
+    </details>
+  </div>
+  <details id="stats-details" style="margin:8px 0;display:none">
+    <summary style="cursor:pointer;font-size:15px;font-weight:600;padding:8px 0">Статистика</summary>
+    <div id="stats-v2"></div>
   </details>
-  <details id="fb-details" style="margin:8px 0;display:none">
-    <summary style="cursor:pointer;font-size:15px;font-weight:600;padding:8px 0">Для бизнеса</summary>
-    <div id="fb-error" class="error"></div>
-    <div id="fb-body"></div>
-  </details>
-  <div id="orders"></div>
 
   <script>
     let refreshInterval = null;
@@ -64,6 +99,10 @@
     let wtbPoints = [];
     let wtbDirty = false;
     let fbDirty = false;
+    let porDirty = false;
+    let wtbServerJson = null;
+    let fbServerJson  = null;
+    let porServerJson = null;
 
     function beep() {
       if (!audioCtx) return;
@@ -81,11 +120,21 @@
     }
 
     const LABELS = {
+      NEW:       '🆕 Новый',
       ACCEPTED: '✅ Принят',
       REJECTED:  '❌ Отклонён',
       COOKING:   '🍳 Готовится',
       ONWAY:     '🚗 Выехал',
       DONE:      '✅ Доставлен',
+    };
+
+    const PREPARED_LABELS = {
+      NEW:      '🆕 Новая',
+      ACCEPTED: '✅ Принята',
+      COOKING:  '🍳 Готовится',
+      ONWAY:    '🚗 Выехал',
+      DONE:     '✅ Доставлена',
+      REJECTED: '❌ Отклонена',
     };
 
     function base() { return document.getElementById('apiBase').value.replace(/\/$/, ''); }
@@ -111,6 +160,7 @@
       else { el.type = 'password'; btn.textContent = 'показать'; }
     }
     function clearError()   { document.getElementById('error').textContent = ''; }
+    function setDetailsDirty(id, dirty) { document.getElementById(id)?.classList.toggle('has-dirty', dirty); }
     function showStockError(msg) { document.getElementById('stock-error').textContent = msg; }
     function clearStockError()   { document.getElementById('stock-error').textContent = ''; }
 
@@ -165,6 +215,7 @@
           if (wtb) {
             renderWtb(wtb);
             document.getElementById('wtb-details').style.display = '';
+            document.getElementById('storefront-section').style.display = '';
           }
         })
         .catch(() => {});
@@ -174,6 +225,17 @@
           if (fb) {
             renderFb(fb);
             document.getElementById('fb-details').style.display = '';
+            document.getElementById('storefront-section').style.display = '';
+          }
+        })
+        .catch(() => {});
+      fetch(`${base()}/api/content/prepared-on-request`)
+        .then(r => r.ok ? r.json() : null)
+        .then(por => {
+          if (por) {
+            renderPor(por);
+            document.getElementById('por-details').style.display = '';
+            document.getElementById('storefront-section').style.display = '';
           }
         })
         .catch(() => {});
@@ -191,15 +253,21 @@
           }
         })
         .catch(() => {});
+      loadPrepared();
       clearInterval(refreshInterval);
       refreshInterval = setInterval(load, 15000);
     }
 
     function render(orders) {
-      document.getElementById('orders').innerHTML = orders.map(o => `
+      document.getElementById('orders-section').style.display = '';
+      document.getElementById('jump-nav').style.display = 'flex';
+      const CLOSED_STATUSES = new Set(['DONE', 'REJECTED']);
+      const active = orders.filter(o => !CLOSED_STATUSES.has(o.status));
+      const closed = orders.filter(o => CLOSED_STATUSES.has(o.status));
+      const cardTpl = o => `
         <div class="order">
           <div class="order-meta">
-            <b>#${o.id}</b> · <b>${o.status}</b> · ${o.total_rub}₽ · ${o.created_at ?? ''}
+            <b>#${o.id}</b> · <b>${LABELS[o.status] ?? o.status}</b> · ${o.total_rub}₽ · ${o.created_at ?? ''}
           </div>
           <div>${o.address ?? ''} · ${o.phone ?? ''}</div>
           ${o.comment ? `<div style="font-size:13px;opacity:.7">${o.comment}</div>` : ''}
@@ -208,11 +276,28 @@
           ).join('<br>')}</div>` : ''}
           <div class="btns">
             ${Object.entries(LABELS).map(([s, l]) =>
-              `<button onclick="setStatus('${o.id}','${s}')">${l}</button>`
+              `<button onclick="setStatus('${o.id}','${s}')" style="${s === o.status ? 'outline:2px solid #f0a830;font-weight:700' : 'opacity:.55'}">${l}</button>`
             ).join('')}
           </div>
+          <div style="margin-top:8px;display:flex;gap:6px;align-items:center">
+            <input id="note-${o.id}" value="${esc(o.operator_note||'')}" placeholder="Заметка оператора"
+              style="flex:1;padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px">
+            <button id="notebtn-${o.id}" onclick="saveNote('${o.id}','note-${o.id}','notebtn-${o.id}')"
+              style="padding:4px 10px;font-size:12px;background:#eee;color:#333;border:none;border-radius:6px;cursor:pointer;white-space:nowrap">
+              Сохранить заметку
+            </button>
+          </div>
         </div>
-      `).join('') || '<div style="opacity:.5">Заказов нет</div>';
+      `;
+      document.getElementById('orders-active').innerHTML = active.map(cardTpl).join('');
+      const activeSection = document.getElementById('orders-active-section');
+      const activeTitle = document.getElementById('orders-active-title');
+      activeSection.style.display = active.length ? '' : 'none';
+      if (activeTitle) activeTitle.textContent = active.length ? `Обычные заказы (${active.length})` : 'Обычные заказы';
+      const closedEl = document.getElementById('orders-closed');
+      const closedDetails = document.getElementById('orders-closed-details');
+      closedEl.innerHTML = closed.map(cardTpl).join('');
+      closedDetails.style.display = closed.length ? '' : 'none';
     }
 
     function fmtDate(iso) { const p = iso.split('-'); return `${p[2]}.${p[1]}.${p[0].slice(2)}`; }
@@ -344,6 +429,101 @@
       load(); // reload only on success
     }
 
+    function renderPreparedOrders(requests) {
+      const CLOSED_STATUSES = new Set(['DONE', 'REJECTED']);
+      const active = requests.filter(r => !CLOSED_STATUSES.has(r.status));
+      const closed = requests.filter(r => CLOSED_STATUSES.has(r.status));
+      const title = document.getElementById('prepared-section-title');
+      if (title) title.textContent = active.length
+        ? `Заявки на готовый вид (${active.length})`
+        : 'Заявки на готовый вид';
+      const cardTpl = req => `
+        <div class="order">
+          <div class="order-meta">
+            <b>#${req.id}</b> · <b>${PREPARED_LABELS[req.status] ?? req.status}</b> · ${req.created_at ?? ''}
+          </div>
+          <div>${esc(req.name)} · ${esc(req.phone)}</div>
+          ${req.desired_time ? `<div style="font-size:13px;opacity:.7">К: ${esc(req.desired_time)}</div>` : ''}
+          ${req.comment ? `<div style="font-size:13px;opacity:.7">${esc(req.comment)}</div>` : ''}
+          ${(req.items || []).length ? `<div style="font-size:13px;margin-top:4px">Позиции:<br>${req.items.map(i =>
+            `• ${esc(i.name)} — ${i.qty} шт.`
+          ).join('<br>')}</div>` : ''}
+          <div class="btns">
+            ${Object.entries(PREPARED_LABELS).map(([s, l]) =>
+              `<button onclick="setPreparedStatus('${req.id}','${s}')" style="${s === req.status ? 'outline:2px solid #f0a830;font-weight:700' : 'opacity:.55'}">${l}</button>`
+            ).join('')}
+          </div>
+          <div style="margin-top:8px;display:flex;gap:6px;align-items:center">
+            <input id="pnote-${req.id}" value="${esc(req.operator_note||'')}" placeholder="Заметка оператора"
+              style="flex:1;padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px">
+            <button id="pnotebtn-${req.id}" onclick="savePreparedNote('${req.id}','pnote-${req.id}','pnotebtn-${req.id}')"
+              style="padding:4px 10px;font-size:12px;background:#eee;color:#333;border:none;border-radius:6px;cursor:pointer;white-space:nowrap">
+              Сохранить заметку
+            </button>
+          </div>
+        </div>
+      `;
+      document.getElementById('prepared-section').style.display = active.length ? '' : 'none';
+      document.getElementById('prepared-orders').innerHTML = active.map(cardTpl).join('');
+      const closedEl = document.getElementById('prepared-orders-closed');
+      const closedDetails = document.getElementById('prepared-closed-details');
+      closedEl.innerHTML = closed.map(cardTpl).join('');
+      closedDetails.style.display = closed.length ? '' : 'none';
+    }
+
+    async function saveNote(orderId, inputId, btnId) {
+      const note = document.getElementById(inputId)?.value ?? '';
+      const { value: token, error: tokenError } = sanitizeToken(tok());
+      if (tokenError) { showError(tokenError); return; }
+      const r = await fetch(`${base()}/api/orders/${orderId}/note?note=${encodeURIComponent(note)}`, {
+        method: 'POST', headers: { 'X-Admin-Token': token },
+      }).catch(() => null);
+      const btn = document.getElementById(btnId);
+      if (r && r.ok && btn) {
+        const orig = btn.textContent;
+        btn.textContent = '✓ Сохранено';
+        setTimeout(() => { btn.textContent = orig; }, 2000);
+      }
+    }
+    async function savePreparedNote(reqId, inputId, btnId) {
+      const note = document.getElementById(inputId)?.value ?? '';
+      const { value: token, error: tokenError } = sanitizeToken(tok());
+      if (tokenError) { showError(tokenError); return; }
+      const r = await fetch(`${base()}/api/admin/prepared-requests/${reqId}/note?note=${encodeURIComponent(note)}`, {
+        method: 'POST', headers: { 'X-Admin-Token': token },
+      }).catch(() => null);
+      const btn = document.getElementById(btnId);
+      if (r && r.ok && btn) {
+        const orig = btn.textContent;
+        btn.textContent = '✓ Сохранено';
+        setTimeout(() => { btn.textContent = orig; }, 2000);
+      }
+    }
+    async function setPreparedStatus(id, status) {
+      clearError();
+      const { value: token, error: tokenError } = sanitizeToken(tok());
+      if (tokenError) { showError(tokenError); return; }
+      const r = await fetch(`${base()}/api/admin/prepared-requests/${id}/status?status=${status}`, {
+        method: 'POST',
+        headers: { 'X-Admin-Token': token },
+      }).catch(() => { showError('Не удалось подключиться. Проверьте адрес сервера.'); return null; });
+      if (!r) return;
+      if (!r.ok) { showError(await parseError(r)); return; }
+      loadPrepared();
+    }
+
+    async function loadPrepared() {
+      const { value: token, error: tokenError } = sanitizeToken(tok());
+      if (tokenError) return;
+      const r = await fetch(`${base()}/api/admin/prepared-requests`, {
+        headers: { 'X-Admin-Token': token },
+      }).catch(() => null);
+      if (!r || !r.ok) return;
+      const data = await r.json();
+      renderPreparedOrders(data);
+      document.getElementById('prepared-section').style.display = '';
+    }
+
     // ── Редактор товаров ──────────────────────────────────────────────
     function esc(s) {
       return String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -371,34 +551,47 @@
 
     function renderItemRow(item, idx, cat) {
       return `
-        <div id="erow-${esc(item.id)}" oninput="markItemDirty('${esc(item.id)}')" style="border:1px solid #eee;border-radius:8px;padding:10px;margin-bottom:6px">
+        <div id="erow-${esc(item.id)}" oninput="markItemDirty('${esc(item.id)}')" style="border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#fafafa">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
             <span style="font-size:13px;font-weight:600">${esc(item.name)}</span>
             <span style="display:flex;gap:4px">
-              <button onclick="moveItem('${esc(cat.id)}','${esc(item.id)}',-1)" style="padding:2px 7px;font-size:13px;border:1px solid #ddd;border-radius:4px;background:#fafafa;cursor:pointer" ${idx===0?'disabled':''}>↑</button>
-              <button onclick="moveItem('${esc(cat.id)}','${esc(item.id)}',1)"  style="padding:2px 7px;font-size:13px;border:1px solid #ddd;border-radius:4px;background:#fafafa;cursor:pointer" ${idx===cat.items.length-1?'disabled':''}>↓</button>
+              <button onclick="moveItem('${esc(cat.id)}','${esc(item.id)}',-1)" style="padding:5px 10px;font-size:14px;border:1px solid #999;border-radius:6px;background:#e8e8e8;color:#333;cursor:pointer;font-weight:700;line-height:1" ${idx===0?'disabled':''}>↑</button>
+              <button onclick="moveItem('${esc(cat.id)}','${esc(item.id)}',1)"  style="padding:5px 10px;font-size:14px;border:1px solid #999;border-radius:6px;background:#e8e8e8;color:#333;cursor:pointer;font-weight:700;line-height:1" ${idx===cat.items.length-1?'disabled':''}>↓</button>
             </span>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+          <div style="display:grid;grid-template-columns:0.7fr 1.3fr;gap:6px;margin-bottom:6px">
             <label style="font-size:12px;opacity:.6">Цена (₽)
-              <input id="ep-${esc(item.id)}" type="number" step="1" value="${esc(item.price ?? '')}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+              <input id="ep-${esc(item.id)}" type="number" step="1" value="${esc(item.price ?? '')}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;box-sizing:border-box">
             </label>
-            <label style="font-size:12px;opacity:.6">В наличии
-              <select id="es-${esc(item.id)}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
-                <option value="true"  ${item.in_stock!==false?'selected':''}>Есть</option>
-                <option value="false" ${item.in_stock===false?'selected':''}>Нет</option>
-              </select>
+            <label style="font-size:12px;opacity:.6">Заголовок
+              <input id="et-${esc(item.id)}" value="${esc(item.title||'')}" placeholder="${esc(item.name)}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;box-sizing:border-box">
             </label>
-            <label style="font-size:12px;opacity:.6">Заголовок (title)
-              <input id="et-${esc(item.id)}" value="${esc(item.title||'')}" placeholder="${esc(item.name)}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
-            </label>
-            <label style="font-size:12px;opacity:.6">Подзаголовок (subtitle)
-              <input id="eu-${esc(item.id)}" value="${esc(item.subtitle||'')}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+            <label style="font-size:12px;opacity:.6">Подзаголовок
+              <input id="eu-${esc(item.id)}" value="${esc(item.subtitle||'')}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;box-sizing:border-box">
             </label>
           </div>
-          <button onclick="saveItem('${esc(item.id)}')" style="padding:6px 16px;border:none;border-radius:6px;background:#3390ec;color:#fff;font-size:13px;cursor:pointer">Сохранить</button>
-          <button onclick="reloadItem('${esc(item.id)}')" style="padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer;margin-left:6px">Сбросить изменения</button>
-          <span id="emsg-${esc(item.id)}" style="font-size:12px;margin-left:8px;opacity:.6"></span>
+          <div style="padding-top:8px;margin-top:4px;border-top:1px solid #f0f0f0;margin-bottom:6px">
+            <div style="font-size:11px;font-weight:600;opacity:.45;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Для заказа в готовом виде</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              <label style="font-size:11px;opacity:.5">Время приготовления
+                <input id="epwt-${esc(item.id)}" value="${esc(item.prepared_wait_time||'')}" placeholder="напр. 30–40 минут" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #eee;border-radius:6px;font-size:12px;box-sizing:border-box">
+              </label>
+              <label style="font-size:11px;opacity:.5">Минимальный заказ
+                <input id="epmo-${esc(item.id)}" value="${esc(item.prepared_min_order||'')}" placeholder="напр. от 1 кг" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #eee;border-radius:6px;font-size:12px;box-sizing:border-box">
+              </label>
+              <label style="font-size:11px;opacity:.5">Цена в готовом виде
+                <input id="eppt-${esc(item.id)}" value="${esc(item.prepared_price_text||'')}" placeholder="напр. уточняется" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #eee;border-radius:6px;font-size:12px;box-sizing:border-box">
+              </label>
+              <label style="font-size:11px;opacity:.5">Примечание к позиции
+                <input id="epn-${esc(item.id)}" value="${esc(item.prepared_note||'')}" placeholder="доп. условия" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #eee;border-radius:6px;font-size:12px;box-sizing:border-box">
+              </label>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:4px">
+            <button onclick="saveItem('${esc(item.id)}')" style="padding:6px 16px;border:none;border-radius:6px;background:#3390ec;color:#fff;font-size:13px;cursor:pointer">Сохранить</button>
+            <button onclick="reloadItem('${esc(item.id)}')" style="padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer">Сбросить изменения</button>
+          </div>
+          <div><span id="emsg-${esc(item.id)}" style="font-size:12px;opacity:.6"></span></div>
           <div style="margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <img id="ethumb-${esc(item.id)}" src="${esc(item.image||'')}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid #eee;${item.image?'':'display:none'}">
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -417,13 +610,22 @@
       const { value: token, error: tokenError } = sanitizeToken(tok());
       if (tokenError) { showEditorError(tokenError); return; }
       const price = parseInt(document.getElementById(`ep-${itemId}`)?.value, 10);
-      const in_stock = document.getElementById(`es-${itemId}`)?.value === 'true';
-      const title    = document.getElementById(`et-${itemId}`)?.value ?? '';
-      const subtitle = document.getElementById(`eu-${itemId}`)?.value ?? '';
+      let in_stock = true;
+      for (const cat of editorCatalog) { const it = cat.items.find(i => i.id === itemId); if (it) { in_stock = it.in_stock !== false; break; } }
+      const title             = document.getElementById(`et-${itemId}`)?.value ?? '';
+      const subtitle          = document.getElementById(`eu-${itemId}`)?.value ?? '';
+      const prepared_wait_time  = document.getElementById(`epwt-${itemId}`)?.value ?? '';
+      const prepared_min_order  = document.getElementById(`epmo-${itemId}`)?.value ?? '';
+      const prepared_price_text = document.getElementById(`eppt-${itemId}`)?.value ?? '';
+      const prepared_note       = document.getElementById(`epn-${itemId}`)?.value ?? '';
       const body = { in_stock };
       if (!isNaN(price)) body.price = price;
-      body.title    = title;
-      body.subtitle = subtitle;
+      body.title             = title;
+      body.subtitle          = subtitle;
+      body.prepared_wait_time  = prepared_wait_time;
+      body.prepared_min_order  = prepared_min_order;
+      body.prepared_price_text = prepared_price_text;
+      body.prepared_note       = prepared_note;
       const msgEl = document.getElementById(`emsg-${itemId}`);
       if (msgEl) { msgEl.textContent = '…'; msgEl.style.cssText = 'font-size:12px;margin-left:8px;opacity:.6'; }
       const r = await fetch(`${base()}/api/admin/catalog/items/${itemId}`, {
@@ -518,6 +720,118 @@
       if (!r) return;
       if (!r.ok) { showEditorError(await parseError(r)); return; }
       renderEditor(editorCatalog);
+      const msgEl = document.getElementById(`emsg-${itemId}`);
+      if (msgEl) { msgEl.textContent = '✓ Порядок обновлён'; setTimeout(() => { if (msgEl.textContent === '✓ Порядок обновлён') msgEl.textContent = ''; }, 2000); }
+    }
+    function currentFbJson() {
+      return JSON.stringify({
+        enabled:             document.getElementById('fb-enabled')?.checked ?? true,
+        title:               document.getElementById('fb-title')?.value ?? '',
+        subtitle:            document.getElementById('fb-subtitle')?.value ?? '',
+        product_summary:     document.getElementById('fb-summary')?.value ?? '',
+        benefits:            document.getElementById('fb-benefits')?.value ?? '',
+        who_its_for:         document.getElementById('fb-who')?.value ?? '',
+        steps:               document.getElementById('fb-steps')?.value ?? '',
+        docs_note:           document.getElementById('fb-docs')?.value ?? '',
+        cta_text:            document.getElementById('fb-cta-text')?.value ?? '',
+        cta_mode:            document.getElementById('fb-cta-mode')?.value ?? 'phone',
+        cta_value:           document.getElementById('fb-cta-value')?.value ?? '',
+        secondary_cta_text:  document.getElementById('fb-sec-text')?.value ?? '',
+        secondary_cta_mode:  document.getElementById('fb-sec-mode')?.value ?? 'link',
+        secondary_cta_value: document.getElementById('fb-sec-value')?.value ?? '',
+      });
+    }
+    function checkFbDirty() {
+      if (!fbServerJson) return;
+      const isDirty = currentFbJson() !== fbServerJson;
+      fbDirty = isDirty; setDetailsDirty('fb-details', isDirty);
+      const m = document.getElementById('fb-msg');
+      if (m) {
+        if (isDirty) { m.textContent = 'Есть несохранённые изменения'; m.style.cssText = 'font-size:12px;color:#92400e;font-weight:600;opacity:1'; }
+        else { m.textContent = ''; m.style.cssText = 'font-size:12px;opacity:.6'; }
+      }
+      const base = JSON.parse(fbServerJson);
+      [
+        ['fb-enabled','enabled'],['fb-title','title'],['fb-subtitle','subtitle'],
+        ['fb-summary','product_summary'],['fb-benefits','benefits'],['fb-who','who_its_for'],
+        ['fb-steps','steps'],['fb-docs','docs_note'],['fb-cta-text','cta_text'],
+        ['fb-cta-mode','cta_mode'],['fb-cta-value','cta_value'],
+        ['fb-sec-text','secondary_cta_text'],['fb-sec-mode','secondary_cta_mode'],['fb-sec-value','secondary_cta_value'],
+      ].forEach(([id, key]) => {
+        const el = document.getElementById(id);
+        if (el) highlightField(id, String(el.type === 'checkbox' ? el.checked : el.value) !== String(base[key]));
+      });
+    }
+    function currentWtbJson() {
+      commitWtbInputs();
+      return JSON.stringify({
+        title:       document.getElementById('wtb-title')?.value ?? '',
+        description: document.getElementById('wtb-desc')?.value ?? '',
+        points:      wtbPoints,
+      });
+    }
+    function checkWtbDirty() {
+      if (!wtbServerJson) return;
+      const isDirty = currentWtbJson() !== wtbServerJson;
+      wtbDirty = isDirty; setDetailsDirty('wtb-details', isDirty);
+      const m = document.getElementById('wtb-msg');
+      if (m) {
+        if (isDirty) { m.textContent = 'Есть несохранённые изменения'; m.style.cssText = 'font-size:12px;color:#92400e;font-weight:600;opacity:1'; }
+        else { m.textContent = ''; m.style.cssText = 'font-size:12px;opacity:.6'; }
+      }
+      updateWtbPointMarkers();
+    }
+    function currentPorJson() {
+      return JSON.stringify({
+        visible:              document.getElementById('por-visible')?.checked ?? true,
+        title:                document.getElementById('por-title')?.value ?? '',
+        subtitle:             document.getElementById('por-subtitle')?.value ?? '',
+        disclaimer:           document.getElementById('por-disclaimer')?.value ?? '',
+        cta_text:             document.getElementById('por-cta-text')?.value ?? '',
+        cta_secondary_text:   document.getElementById('por-sec-text')?.value ?? '',
+        cta_secondary_mode:   document.getElementById('por-sec-mode')?.value ?? 'phone',
+        cta_secondary_value:  document.getElementById('por-sec-value')?.value ?? '',
+      });
+    }
+    function checkPorDirty() {
+      if (!porServerJson) return;
+      const isDirty = currentPorJson() !== porServerJson;
+      porDirty = isDirty; setDetailsDirty('por-details', isDirty);
+      const m = document.getElementById('por-msg');
+      if (m) {
+        if (isDirty) { m.textContent = 'Есть несохранённые изменения'; m.style.cssText = 'font-size:12px;color:#92400e;font-weight:600;opacity:1'; }
+        else { m.textContent = ''; m.style.cssText = 'font-size:12px;opacity:.6'; }
+      }
+      const base = JSON.parse(porServerJson);
+      [
+        ['por-visible','visible'],['por-title','title'],['por-subtitle','subtitle'],
+        ['por-disclaimer','disclaimer'],['por-cta-text','cta_text'],
+        ['por-sec-text','cta_secondary_text'],['por-sec-mode','cta_secondary_mode'],['por-sec-value','cta_secondary_value'],
+      ].forEach(([id, key]) => {
+        const el = document.getElementById(id);
+        if (el) highlightField(id, String(el.type === 'checkbox' ? el.checked : el.value) !== String(base[key]));
+      });
+    }
+    function highlightField(id, isDirty) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.style.outline = isDirty ? '2px solid #f0a830' : '';
+      if (el.type !== 'checkbox' && el.tagName !== 'SELECT') {
+        el.style.background = isDirty ? '#fffbf3' : '';
+      }
+    }
+    function updateWtbPointMarkers() {
+      if (!wtbServerJson) return;
+      const basePoints = JSON.parse(wtbServerJson).points || [];
+      for (let i = 0; i < wtbPoints.length; i++) {
+        const card  = document.getElementById(`wpoint-${i}`);
+        const badge = document.getElementById(`wdirty-${i}`);
+        if (!card || !badge) continue;
+        const isNew     = i >= basePoints.length;
+        const isChanged = !isNew && JSON.stringify(basePoints[i]) !== JSON.stringify(wtbPoints[i]);
+        card.style.borderColor = (isNew || isChanged) ? '#f0a830' : '#eee';
+        badge.textContent      = isNew ? 'новая' : isChanged ? 'не сохранено' : '';
+      }
     }
     function commitWtbInputs() {
       for (let i = 0; i < wtbPoints.length; i++) {
@@ -533,9 +847,9 @@
       const el = document.getElementById('wtb-points');
       if (!el) return;
       el.innerHTML = wtbPoints.map((p, i) => `
-        <div style="border:1px solid #eee;border-radius:8px;padding:10px;margin-bottom:8px">
+        <div id="wpoint-${i}" style="border:1px solid #eee;border-radius:8px;padding:10px;margin-bottom:8px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <span style="font-size:12px;font-weight:600;opacity:.5">Точка ${i+1}</span>
+            <span style="font-size:12px;font-weight:600;opacity:.5">Точка ${i+1}<span id="wdirty-${i}" style="font-size:11px;color:#92400e;font-weight:600;margin-left:6px"></span></span>
             <button onclick="wtbRemovePoint(${i})" style="padding:2px 8px;border:none;border-radius:4px;background:#e74c3c;color:#fff;font-size:11px;cursor:pointer">Удалить</button>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
@@ -562,6 +876,7 @@
     function renderWtb(data) {
       if (wtbDirty) return;
       wtbPoints = (data.points || []).map(p => ({...p}));
+      wtbServerJson = JSON.stringify({ title: data.title||'', description: data.description||'', points: wtbPoints });
       const body = document.getElementById('wtb-body');
       if (!body) return;
       body.innerHTML = `
@@ -577,17 +892,13 @@
         </div>
         <div id="wtb-points"></div>
       `;
-      body.oninput = () => {
-        if (!wtbDirty) { wtbDirty = true; }
-        const m = document.getElementById('wtb-msg');
-        if (m) { m.textContent = 'Есть несохранённые изменения'; m.style.cssText = 'font-size:12px;margin-left:8px;color:#92400e;font-weight:600;opacity:1'; }
-      };
+      body.oninput = body.onchange = () => { checkWtbDirty(); };
       body.innerHTML += `
         <button onclick="wtbAddPoint()" style="margin:8px 0;padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer">+ Добавить точку</button>
-        <div style="margin-top:12px">
+        <div style="margin-top:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <button onclick="saveWtb()" style="padding:6px 16px;border:none;border-radius:6px;background:#3390ec;color:#fff;font-size:13px;cursor:pointer">Сохранить</button>
-          <button onclick="reloadWtb()" style="padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer;margin-left:6px">Сбросить изменения</button>
-          <span id="wtb-msg" style="font-size:12px;margin-left:8px;opacity:.6"></span>
+          <button onclick="reloadWtb()" style="padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer">Сбросить изменения</button>
+          <span id="wtb-msg" style="font-size:12px;opacity:.6"></span>
         </div>
       `;
       renderWtbPoints();
@@ -597,18 +908,15 @@
       commitWtbInputs();
       wtbPoints.push({ city: 'Оренбург', name: '', address: '', schedule: '', note: '' });
       renderWtbPoints();
-      wtbDirty = true;
-      const m = document.getElementById('wtb-msg');
-      if (m) { m.textContent = 'Есть несохранённые изменения'; m.style.cssText = 'font-size:12px;margin-left:8px;color:#92400e;font-weight:600;opacity:1'; }
+      checkWtbDirty();
     }
 
     function wtbRemovePoint(i) {
+      if (!confirm('Удалить точку? Изменение вступит в силу только после сохранения.')) return;
       commitWtbInputs();
       wtbPoints.splice(i, 1);
       renderWtbPoints();
-      wtbDirty = true;
-      const m = document.getElementById('wtb-msg');
-      if (m) { m.textContent = 'Есть несохранённые изменения'; m.style.cssText = 'font-size:12px;margin-left:8px;color:#92400e;font-weight:600;opacity:1'; }
+      checkWtbDirty();
     }
 
     async function saveWtb() {
@@ -633,8 +941,9 @@
       }).catch(() => { document.getElementById('wtb-error').textContent = 'Не удалось подключиться.'; if (msg) msg.textContent = ''; return null; });
       if (!r) return;
       if (!r.ok) { document.getElementById('wtb-error').textContent = await parseError(r); if (msg) msg.textContent = ''; return; }
+      wtbServerJson = currentWtbJson();
+      checkWtbDirty();
       if (msg) { msg.textContent = '✓ Сохранено'; setTimeout(() => { msg.textContent = ''; }, 2000); }
-      wtbDirty = false;
     }
 
     function renderFb(data) {
@@ -642,6 +951,22 @@
       const body = document.getElementById('fb-body');
       if (!body) return;
       const listToText = arr => (arr || []).join('\n');
+      fbServerJson = JSON.stringify({
+        enabled:             !!data.enabled,
+        title:               data.title||'',
+        subtitle:            data.subtitle||'',
+        product_summary:     listToText(data.product_summary),
+        benefits:            listToText(data.benefits),
+        who_its_for:         listToText(data.who_its_for),
+        steps:               listToText(data.steps),
+        docs_note:           data.docs_note||'',
+        cta_text:            data.cta_text||'',
+        cta_mode:            data.cta_mode||'phone',
+        cta_value:           data.cta_value||'',
+        secondary_cta_text:  data.secondary_cta_text||'',
+        secondary_cta_mode:  data.secondary_cta_mode||'link',
+        secondary_cta_value: data.secondary_cta_value||'',
+      });
       body.innerHTML = `
         <div style="margin-bottom:10px">
           <label style="font-size:12px;opacity:.6;display:flex;align-items:center;gap:6px">
@@ -718,17 +1043,13 @@
             </label>
           </div>
         </div>
-        <div style="margin-top:12px">
+        <div style="margin-top:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <button onclick="saveFb()" style="padding:6px 16px;border:none;border-radius:6px;background:#3390ec;color:#fff;font-size:13px;cursor:pointer">Сохранить</button>
-          <button onclick="reloadFb()" style="padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer;margin-left:6px">Сбросить изменения</button>
-          <span id="fb-msg" style="font-size:12px;margin-left:8px;opacity:.6"></span>
+          <button onclick="reloadFb()" style="padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer">Сбросить изменения</button>
+          <span id="fb-msg" style="font-size:12px;opacity:.6"></span>
         </div>
       `;
-      body.oninput = () => {
-        if (!fbDirty) { fbDirty = true; }
-        const m = document.getElementById('fb-msg');
-        if (m) { m.textContent = 'Есть несохранённые изменения'; m.style.cssText = 'font-size:12px;margin-left:8px;color:#92400e;font-weight:600;opacity:1'; }
-      };
+      body.oninput = body.onchange = () => { checkFbDirty(); };
     }
 
     function splitLines(id) {
@@ -764,8 +1085,9 @@
       }).catch(() => { document.getElementById('fb-error').textContent = 'Не удалось подключиться.'; if (msg) msg.textContent = ''; return null; });
       if (!r) return;
       if (!r.ok) { document.getElementById('fb-error').textContent = await parseError(r); if (msg) msg.textContent = ''; return; }
+      fbServerJson = currentFbJson();
+      checkFbDirty();
       if (msg) { msg.textContent = '✓ Сохранено'; setTimeout(() => { msg.textContent = ''; }, 2000); }
-      fbDirty = false;
     }
 
     function markItemDirty(itemId) {
@@ -802,6 +1124,114 @@
       if (!found) showEditorError('Не удалось перезагрузить товар с сервера.');
     }
 
+    function renderPor(data) {
+      if (porDirty) return;
+      const body = document.getElementById('por-body');
+      if (!body) return;
+      porServerJson = JSON.stringify({
+        visible:             !!data.visible,
+        title:               data.title||'',
+        subtitle:            data.subtitle||'',
+        disclaimer:          data.disclaimer||'',
+        cta_text:            data.cta_text||'',
+        cta_secondary_text:  data.cta_secondary_text||'',
+        cta_secondary_mode:  data.cta_secondary_mode||'phone',
+        cta_secondary_value: data.cta_secondary_value||'',
+      });
+      body.innerHTML = `
+        <div style="margin-bottom:10px">
+          <label style="font-size:12px;opacity:.6;display:flex;align-items:center;gap:6px">
+            <input id="por-visible" type="checkbox" ${data.visible ? 'checked' : ''}>
+            Показывать блок на витрине
+          </label>
+        </div>
+        <div style="margin-bottom:10px">
+          <label style="font-size:12px;opacity:.6">Заголовок<br>
+            <input id="por-title" value="${esc(data.title||'')}" style="width:100%;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:2px">
+          </label>
+        </div>
+        <div style="margin-bottom:10px">
+          <label style="font-size:12px;opacity:.6">Подзаголовок<br>
+            <input id="por-subtitle" value="${esc(data.subtitle||'')}" style="width:100%;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:2px">
+          </label>
+        </div>
+        <div style="margin-bottom:10px">
+          <label style="font-size:12px;opacity:.6">Дисклеймер / пояснение<br>
+            <textarea id="por-disclaimer" rows="4" style="width:100%;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:2px;resize:vertical;font-family:inherit">${esc(data.disclaimer||'')}</textarea>
+          </label>
+        </div>
+        <div style="margin-bottom:10px">
+          <label style="font-size:12px;opacity:.6">Текст основной кнопки<br>
+            <input id="por-cta-text" value="${esc(data.cta_text||'')}" style="width:100%;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:2px">
+          </label>
+        </div>
+        <div style="margin-bottom:16px;padding:10px;border:1px solid #eee;border-radius:8px">
+          <div style="font-size:12px;font-weight:600;opacity:.5;margin-bottom:8px">Вторичная CTA</div>
+          <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:end">
+            <label style="font-size:12px;opacity:.6">Текст кнопки<br>
+              <input id="por-sec-text" value="${esc(data.cta_secondary_text||'')}" style="width:100%;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:2px">
+            </label>
+            <label style="font-size:12px;opacity:.6">Режим<br>
+              <select id="por-sec-mode" style="padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:2px">
+                <option value="phone" ${data.cta_secondary_mode==='phone'?'selected':''}>phone</option>
+                <option value="link" ${data.cta_secondary_mode==='link'?'selected':''}>link</option>
+              </select>
+            </label>
+            <label style="font-size:12px;opacity:.6">Значение (тел. или URL)<br>
+              <input id="por-sec-value" value="${esc(data.cta_secondary_value||'')}" style="width:100%;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-top:2px">
+            </label>
+          </div>
+        </div>
+        <div style="margin-top:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <button onclick="savePor()" style="padding:6px 16px;border:none;border-radius:6px;background:#3390ec;color:#fff;font-size:13px;cursor:pointer">Сохранить</button>
+          <button onclick="reloadPor()" style="padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer">Сбросить изменения</button>
+          <span id="por-msg" style="font-size:12px;opacity:.6"></span>
+        </div>
+      `;
+      body.oninput = body.onchange = () => { checkPorDirty(); };
+    }
+
+    async function savePor() {
+      const { value: token, error: tokenError } = sanitizeToken(tok());
+      if (tokenError) { document.getElementById('por-error').textContent = tokenError; return; }
+      document.getElementById('por-error').textContent = '';
+      const payload = {
+        visible:             document.getElementById('por-visible')?.checked ?? false,
+        title:               document.getElementById('por-title')?.value ?? '',
+        subtitle:            document.getElementById('por-subtitle')?.value ?? '',
+        disclaimer:          document.getElementById('por-disclaimer')?.value ?? '',
+        cta_text:            document.getElementById('por-cta-text')?.value ?? '',
+        cta_secondary_text:  document.getElementById('por-sec-text')?.value ?? '',
+        cta_secondary_mode:  document.getElementById('por-sec-mode')?.value ?? 'phone',
+        cta_secondary_value: document.getElementById('por-sec-value')?.value ?? '',
+      };
+      const msg = document.getElementById('por-msg');
+      if (msg) { msg.textContent = '…'; msg.style.cssText = 'font-size:12px;margin-left:8px;opacity:.6'; }
+      const r = await fetch(`${base()}/api/admin/content/prepared-on-request`, {
+        method: 'PUT',
+        headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => { document.getElementById('por-error').textContent = 'Не удалось подключиться.'; if (msg) msg.textContent = ''; return null; });
+      if (!r) return;
+      if (!r.ok) { document.getElementById('por-error').textContent = await parseError(r); if (msg) msg.textContent = ''; return; }
+      porServerJson = currentPorJson();
+      checkPorDirty();
+      if (msg) { msg.textContent = '✓ Сохранено'; setTimeout(() => { msg.textContent = ''; }, 2000); }
+    }
+
+    async function reloadPor() {
+      const msg = document.getElementById('por-msg');
+      if (msg) msg.textContent = '…';
+      const r = await fetch(`${base()}/api/content/prepared-on-request`)
+        .catch(() => { document.getElementById('por-error').textContent = 'Не удалось подключиться.'; if (msg) msg.textContent = ''; return null; });
+      if (!r) return;
+      if (!r.ok) { document.getElementById('por-error').textContent = await parseError(r); if (msg) msg.textContent = ''; return; }
+      const data = await r.json();
+      porDirty = false; setDetailsDirty('por-details', false);
+      if (msg) { msg.textContent = ''; msg.style.cssText = 'font-size:12px;margin-left:8px;opacity:.6'; }
+      renderPor(data);
+    }
+
     async function reloadWtb() {
       const msg = document.getElementById('wtb-msg');
       if (msg) msg.textContent = '…';
@@ -810,7 +1240,7 @@
       if (!r) return;
       if (!r.ok) { document.getElementById('wtb-error').textContent = await parseError(r); if (msg) msg.textContent = ''; return; }
       const data = await r.json();
-      wtbDirty = false;
+      wtbDirty = false; setDetailsDirty('wtb-details', false);
       if (msg) { msg.textContent = ''; msg.style.cssText = 'font-size:12px;margin-left:8px;opacity:.6'; }
       renderWtb(data);
     }
@@ -823,10 +1253,19 @@
       if (!r) return;
       if (!r.ok) { document.getElementById('fb-error').textContent = await parseError(r); if (msg) msg.textContent = ''; return; }
       const data = await r.json();
-      fbDirty = false;
+      fbDirty = false; setDetailsDirty('fb-details', false);
       if (msg) { msg.textContent = ''; msg.style.cssText = 'font-size:12px;margin-left:8px;opacity:.6'; }
       renderFb(data);
     }
+    window.addEventListener('scroll', function() {
+      document.getElementById('back-to-top').style.display =
+        window.scrollY > 300 ? 'block' : 'none';
+    });
   </script>
+  <button id="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})"
+    aria-label="Наверх" title="Наверх"
+    style="display:none;position:fixed;bottom:20px;right:20px;z-index:999;
+           background:#3390ec;color:#fff;border:none;border-radius:50%;width:44px;height:44px;
+           font-size:20px;line-height:1;padding:0;box-shadow:0 2px 8px rgba(0,0,0,.25)">↑</button>
 </body>
 </html>
