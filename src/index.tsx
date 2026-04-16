@@ -1085,9 +1085,12 @@ window.history.replaceState(null, '', _u.toString());
 
       {showPreparedForm && preparedOnRequest && (
         <div style={S.overlay}>
-          <div style={S.overlayHeader}>
+        <div style={S.overlayHeader}>
             <span style={S.overlayTitle}>Можно заказать в готовом виде</span>
             <button style={S.closeBtn} onClick={() => { setShowPreparedForm(false); setPorResult(null); setPorCategoryId(null); }}>×</button>
+          </div>
+          <div style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 10, background: "#f6efe3", color: "#6b4e2e", fontSize: 13, fontWeight: 600, lineHeight: 1.4 }}>
+            Минимальный заказ — от 3 порций.
           </div>
           <div style={{ fontSize: 13, opacity: 0.5, marginBottom: 16, marginTop: -4 }}>Выберите, что приготовить</div>
           {porResult ? (
@@ -1132,7 +1135,6 @@ window.history.replaceState(null, '', _u.toString());
                           {(isExpanded || !showToggle) && (() => {
                             const mostCommon = (vals: (string | undefined)[]) => { const freq: Record<string, number> = {}; for (const v of vals) if (v) freq[v] = (freq[v] ?? 0) + 1; return Object.keys(freq).sort((a, b) => freq[b] - freq[a])[0] ?? null; };
                             const sharedWaitTime = mostCommon(catItems.map(it => it.prepared_wait_time));
-                            const sharedMinOrder = mostCommon(catItems.map(it => it.prepared_min_order));
                             const sharedPriceText = mostCommon(catItems.map(it => it.prepared_price_text));
                             const priceLabel = (v: string) => v === "уточняется при подтверждении" ? "Цену уточним при подтверждении" : `Цена: ${v}`;
                             return (
@@ -1142,10 +1144,9 @@ window.history.replaceState(null, '', _u.toString());
                                     Готовим жареный шашлык — не маринованный.
                                   </div>
                                 )}
-                                {(sharedWaitTime || sharedMinOrder || sharedPriceText) && (
+                                {(sharedWaitTime || sharedPriceText) && (
                                   <div style={{ fontSize: 12, opacity: 0.68, lineHeight: 1.45, marginBottom: 6, paddingLeft: 2 }}>
                                     {sharedWaitTime && <div>Время приготовления: {sharedWaitTime}</div>}
-                                    {sharedMinOrder && <div>Минимальный заказ: {sharedMinOrder}</div>}
                                     {sharedPriceText && <div>{priceLabel(sharedPriceText)}</div>}
                                   </div>
                                 )}
@@ -1155,7 +1156,6 @@ window.history.replaceState(null, '', _u.toString());
                           {(isExpanded || !showToggle) && catItems.map(item => {
                             const mostCommon = (vals: (string | undefined)[]) => { const freq: Record<string, number> = {}; for (const v of vals) if (v) freq[v] = (freq[v] ?? 0) + 1; return Object.keys(freq).sort((a, b) => freq[b] - freq[a])[0] ?? null; };
                             const sharedWaitTime = mostCommon(catItems.map(it => it.prepared_wait_time));
-                            const sharedMinOrder = mostCommon(catItems.map(it => it.prepared_min_order));
                             const sharedPriceText = mostCommon(catItems.map(it => it.prepared_price_text));
                             const priceLabel = (v: string) => v === "уточняется при подтверждении" ? "Цену уточним при подтверждении" : `Цена: ${v}`;
                             const qty = porQtys[item.id] ?? 0;
@@ -1165,7 +1165,6 @@ window.history.replaceState(null, '', _u.toString());
                                   <div style={{ fontSize: 14, fontWeight: 600 }}>{item.title ?? item.name}</div>
                                   {item.subtitle && <div style={{ fontSize: 12, opacity: 0.60, marginTop: 1 }}>{item.subtitle}</div>}
                                   {item.prepared_wait_time && item.prepared_wait_time !== sharedWaitTime && <div style={{ fontSize: 11, opacity: 0.56, lineHeight: 1.35, marginTop: 2 }}>Время: {item.prepared_wait_time}</div>}
-                                  {item.prepared_min_order && item.prepared_min_order !== sharedMinOrder && <div style={{ fontSize: 11, opacity: 0.56, lineHeight: 1.35, marginTop: 1 }}>Минимум: {item.prepared_min_order}</div>}
                                   {item.prepared_price_text && item.prepared_price_text !== sharedPriceText && <div style={{ fontSize: 11, opacity: 0.56, lineHeight: 1.35, marginTop: 1 }}>{priceLabel(item.prepared_price_text)}</div>}
                                   {item.prepared_note && <div style={{ fontSize: 11, opacity: 0.56, lineHeight: 1.35, marginTop: 1 }}>{item.prepared_note}</div>}
                                 </div>
@@ -1220,11 +1219,6 @@ window.history.replaceState(null, '', _u.toString());
                   style={{ ...S.input, resize: "none" as const, height: "auto" }}
                 />
               </div>
-              {preparedOnRequest.disclaimer && (
-                <div style={{ fontSize: 12, opacity: 0.5, lineHeight: 1.5, marginBottom: 16, whiteSpace: "pre-line" as const }}>
-                  {preparedOnRequest.disclaimer}
-                </div>
-              )}
               {(() => {
                 const overlayCats2 = allCategories.filter(cat => itemsForCat(cat).length > 0);
                 const porCanSubmit = !!porName.trim() && !!porPhone.trim() &&
