@@ -1,5 +1,7 @@
+import './index.css';
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import ReactDOM from "react-dom/client";
+import { createPortal } from "react-dom";
 
 declare global {
   interface Window {
@@ -22,6 +24,19 @@ type CatalogItem = {
   prepared_min_order?: string;
   prepared_price_text?: string;
   prepared_note?: string;
+  wait_time?: string;
+  portion_note?: string;
+  old_price?: number | null;
+  promo_enabled?: boolean;
+  promo_label?: string;
+  _orderMode?: "frozen" | "hot";
+};
+type ManualPromotion = {
+  id: string;
+  title: string;
+  description?: string;
+  note?: string;
+  active: boolean;
 };
 type Category = {
   id: string;
@@ -29,35 +44,63 @@ type Category = {
   emoji: string;
   items: CatalogItem[];
 };
+type CatalogBanner = {
+  enabled?: boolean;
+  icon?: string;
+  badge?: string;
+  title?: string;
+  button_text?: string;
+  button_target?: string;
+};
+type CatalogTheme = {
+  primary?: string;
+  cta?: string;
+  bg_page?: string;
+  bg_surface?: string;
+  bg_chip?: string;
+  text_primary?: string;
+  text_secondary?: string;
+  border?: string;
+  accent_announcement?: string;
+};
 type Catalog = {
   shop_name: string;
+  shop_subtitle?: string;
   currency: string;
   work_start_hour?: number;
   work_end_hour?: number;
   free_delivery_from?: number;
   phone?: string;
   order_confirmation_text?: string;
+  banner?: CatalogBanner;
+  theme?: CatalogTheme;
   categories: Category[];
+  hot_categories?: Category[];
 };
 type CartEntry = { item: CatalogItem; qty: number };
+type DisplayItem = CatalogItem & { _srcCatId: string };
 type WhereToBuyPoint = { city: string; name: string; address: string; schedule?: string; note?: string };
 type WhereToBuyContent = { title: string; description: string; points: WhereToBuyPoint[] };
-type PreparedOnRequestItem = { id: string; name: string; note?: string };
-type PreparedOnRequestContent = {
-  visible: boolean;
-  title: string;
-  subtitle: string;
-  items: PreparedOnRequestItem[];
-  disclaimer: string;
-  cta_text: string;
-  cta_secondary_text: string;
-  cta_secondary_mode: string;
-  cta_secondary_value: string;
-};
-
 
 function tgVar(name: string, fallback: string): string {
   return `var(--tg-theme-${name}, ${fallback})`;
+}
+
+const DEFAULT_THEME = {
+  primary:              "#8B2A1F",
+  cta:                  "#3390ec",
+  bg_page:              "#f5f0eb",
+  bg_surface:           "#ffffff",
+  bg_chip:              "#ede8e0",
+  text_primary:         "#3a2e28",
+  text_secondary:       "#8a7a6f",
+  border:               "#e2ddd6",
+  accent_announcement:  "#4a2f26",
+} as const;
+
+type ThemeKey = keyof typeof DEFAULT_THEME;
+function themeVar(key: ThemeKey): string {
+  return `var(--theme-${key.replace(/_/g, '-')}, ${DEFAULT_THEME[key]})`;
 }
 
 const S = {
@@ -67,20 +110,17 @@ const S = {
     background: tgVar("bg-color", "#f7f5f2"),
     color: tgVar("text-color", "#1a1a1a"),
     paddingBottom: 100,
+    marginTop: 0,
+    paddingTop: 0,
   } as React.CSSProperties,
   header: {
-    position: "sticky" as const,
-    top: 0,
-    zIndex: 100,
-    background: tgVar("bg-color", "#f7f5f2"),
-    borderBottom: `1px solid ${tgVar("secondary-bg-color", "#e8e3dc")}`,
-    padding: "14px 16px 12px",
+    padding: "14px 16px 8px",
   } as React.CSSProperties,
   shopName: {
     fontFamily: `"Cormorant Garamond", Georgia, serif`,
     fontSize: 30,
     fontWeight: 700,
-    color: "#1c110a",
+    color: themeVar("text_primary"),
     margin: "0 0 8px",
     letterSpacing: "0.3px",
     lineHeight: 1.15,
@@ -137,27 +177,29 @@ const S = {
   qtyBtn: {
     width: 34, height: 34, borderRadius: "50%", border: "none", fontSize: 20, fontWeight: 600,
     cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-    background: tgVar("button-color", "#3390ec"),
-    color: tgVar("button-text-color", "#ffffff"),
+    background: themeVar("cta"),
+    color: "#ffffff",
     transition: "opacity .15s",
   } as React.CSSProperties,
   qtyText: { width: 40, textAlign: "center" as const, fontSize: 17, fontWeight: 600 } as React.CSSProperties,
   addBtn: {
     padding: "8px 18px", borderRadius: 20, border: "none", fontSize: 14, fontWeight: 600,
-    cursor: "pointer", background: tgVar("button-color", "#3390ec"),
-    color: tgVar("button-text-color", "#ffffff"), transition: "opacity .15s",
+    cursor: "pointer", background: themeVar("cta"),
+    color: "#ffffff", transition: "opacity .15s",
   } as React.CSSProperties,
   bottomBar: {
-    position: "fixed" as const, bottom: 0, left: 0, right: 0, zIndex: 200, padding: "12px 16px",
-    paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
+    position: "fixed" as const, bottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
+    left: 12, right: 12, zIndex: 200, padding: "12px 16px",
     background: tgVar("bg-color", "#ffffff"),
-    borderTop: `1px solid ${tgVar("secondary-bg-color", "#e8e8e8")}`, display: "flex", gap: 10,
+    border: "1px solid rgba(0,0,0,0.08)",
+    borderRadius: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
+    display: "flex", gap: 10,
   } as React.CSSProperties,
   mainButton: (disabled: boolean) =>
     ({
       flex: 1, padding: "14px 0", borderRadius: 12, border: "none", fontSize: 16, fontWeight: 700,
-      cursor: disabled ? "not-allowed" : "pointer", background: tgVar("button-color", "#3390ec"),
-      color: tgVar("button-text-color", "#ffffff"), opacity: disabled ? 0.5 : 1, transition: "opacity .2s",
+      cursor: disabled ? "not-allowed" : "pointer", background: themeVar("cta"),
+      color: "#ffffff", opacity: disabled ? 0.5 : 1, transition: "opacity .2s",
     }) as React.CSSProperties,
   cartButton: {
     width: 52, height: 52, borderRadius: 12, border: "none", fontSize: 22, cursor: "pointer",
@@ -270,19 +312,37 @@ function getClientId(): string {
 
 const DEFAULT_WHERE_TO_BUY: WhereToBuyContent = {
   title: "Где купить",
-  description: "Продукцию «Римских пельменей» можно найти в нескольких торговых точках Оренбурга. Наличие и ассортимент лучше уточнять заранее.",
+  description: "Продукцию «Римских пельменей» можно найти в магазинах Саракташа, Саракташского района и в торговых точках Оренбурга. Ниже указаны точки в Оренбурге — наличие и ассортимент лучше уточнять заранее.",
   points: [
-    { city: "Оренбург", name: "Гармония",          address: "ДНТ Лидиния, ул. Плодовая, 39" },
-    { city: "Оренбург", name: "Домашкино",         address: "ул. Мясокомбинат, д. 1" },
-    { city: "Оренбург", name: "Фрэш Маркет",       address: "Северный проезд, 18/1" },
-    { city: "Оренбург", name: "Продуктовый отдел", address: "ул. Орлова, д. 5" },
-    { city: "Оренбург", name: "Продукты 24",       address: "ул. Постникова, д. 20" },
-    { city: "Оренбург", name: "Магазин у Дома",    address: "пос. Аэропорт, ул. Центральная, д. 4" },
+    { city: "Оренбург",      name: "Гармония",                  address: "ДНТ Лидиния, ул. Плодовая, 39" },
+    { city: "Оренбург",      name: "Домашкино",                 address: "ул. Мясокомбинат, д. 1" },
+    { city: "Оренбург",      name: "Фрэш Маркет",               address: "Северный проезд, 18/1" },
+    { city: "Оренбург",      name: "Продуктовый отдел",         address: "ул. Орлова, д. 5" },
+    { city: "Оренбург",      name: "Продукты 24",               address: "ул. Постникова, д. 20" },
+    { city: "пос. Аэропорт", name: "Магазин у Дома",            address: "ул. Центральная, д. 4" },
+    { city: "Оренбург",      name: "ТЦ «Мелодия», отдел Мясо", address: "ул. Туркестанская, 45" },
   ],
 };
 
+const DISPLAY_CATEGORIES = [
+  { key: "pelmeni",  label: "Пельмени",  emoji: "🥟", frozenIds: ["pelmeni"],  hotIds: ["hot-pelm"]     },
+  { key: "manty",    label: "Манты",     emoji: "🥘", frozenIds: ["manty"],    hotIds: ["hot-manty"]    },
+  { key: "vareniki", label: "Вареники",  emoji: "🥟", frozenIds: ["vareniki"], hotIds: ["hot-var"]      },
+  { key: "kotlety",  label: "Котлеты",   emoji: "🍖", frozenIds: ["kotlety"],  hotIds: ["hot-kotl"]     },
+  { key: "tefteli",  label: "Тефтели",   emoji: "🧆", frozenIds: ["tefteli"],  hotIds: ["hot-teft"]     },
+  { key: "other",    label: "Прочее",    emoji: "🍽️", frozenIds: ["other"],    hotIds: ["hot-other"]    },
+  { key: "shashlik", label: "Шашлык маринованный", emoji: "🔥", frozenIds: ["shashlik"], hotIds: ["hot-shashlik"] },
+  { key: "farsh",    label: "Фарш",      emoji: "🥩", frozenIds: ["farsh"],    hotIds: [] as string[]   },
+];
+
+const HOT_LABELS: Record<string, string> = { shashlik: "Шашлык жареный" };
+
 function App() {
   const API_BASE = (import.meta as any).env?.VITE_API_BASE ?? "";
+  const BONUS_MIN_ORDER_TOTAL = 1500;
+  const BONUS_EARN_PERCENT = 5;
+  const BONUS_MAX_REDEEM_PERCENT = 50;
+  const BONUS_PIN_LENGTH = 5;
   const [isTest] = useState(() => {
     const p = new URLSearchParams(window.location.search);
     if (p.get('test') === '1') {
@@ -302,32 +362,21 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showWhereToBuy, setShowWhereToBuy] = useState(false);
+  const [showPromos, setShowPromos] = useState(false);
+  const [showAllCategories, setShowAllCategories] = useState(false);
+  const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const [whereToBuy, setWhereToBuy] = useState<WhereToBuyContent>(DEFAULT_WHERE_TO_BUY);
-  const [preparedOnRequest, setPreparedOnRequest] = useState<PreparedOnRequestContent | null>(null);
+  const [promotions, setPromotions] = useState<ManualPromotion[]>([]);
+  const loadPromotions = useCallback(() => {
+    fetch(`${API_BASE}/api/content/promotions`, { cache: "no-store" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: { items?: ManualPromotion[] } | null) => {
+        if (data?.items) setPromotions(data.items.filter((p) => p.active));
+      })
+      .catch(() => {});
+  }, [API_BASE]);
   const [forBusinessEnabled, setForBusinessEnabled] = useState<boolean | null>(null);
-  const [showPreparedForm, setShowPreparedForm] = useState(false);
-  const [porName, setPorName] = useState("");
-  const [porPhone, setPorPhone] = useState("");
-  const [porComment, setPorComment] = useState("");
-  const [porDesiredTime, setPorDesiredTime] = useState("");
-  const [porQtys, setPorQtys] = useState<Record<string, number>>({});
-  const [porSending, setPorSending] = useState(false);
-  const [porResult, setPorResult] = useState<{ ok: boolean; text: string } | null>(null);
-  const [showSections, setShowSections] = useState(false);
-  const sectionsRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!showSections) return;
-    const handler = (e: MouseEvent) => {
-      if (sectionsRef.current && !sectionsRef.current.contains(e.target as Node))
-        setShowSections(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [showSections]);
-
   function scrollToSection(id: string) {
-    setShowSections(false);
     const el = document.getElementById(id);
     if (!el) return;
     const y = el.getBoundingClientRect().top + window.scrollY - 128;
@@ -336,6 +385,7 @@ function App() {
 
   const [cart, setCart] = useState<Record<string, CartEntry>>({});
   const [showCart, setShowCart] = useState(false);
+  const cartRef = useRef<HTMLDivElement>(null);
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [comment, setComment] = useState("");
@@ -344,15 +394,26 @@ function App() {
   const [prefilled, setPrefilled] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const [bonusCard, setBonusCard] = useState<{ exists: boolean; available_balance: number } | null>(null);
+  const [bonusLoading, setBonusLoading] = useState(false);
+  const [useBonusChecked, setUseBonusChecked] = useState(false);
+  const [bonusPin, setBonusPin] = useState("");
   const resultRef = useRef<HTMLDivElement>(null);
+  const [bannerDismissed, setBannerDismissed] = useState(() => {
+    try { return localStorage.getItem('banner_hot_dismissed') === '1'; } catch { return false; }
+  });
+  const [showSectionsMenu, setShowSectionsMenu] = useState(false);
   const [orderSent, setOrderSent] = useState<string | null>(
     () => new URLSearchParams(window.location.search).get('order')
   );
 const [orderStatus, setOrderStatus] = useState<"NEW" | "PENDING_CONFIRMATION" | null>(null);
 const [liveStatus, setLiveStatus] = useState<string | null>(null);
 const [copied, setCopied] = useState<string | null>(null);
+const [mode, setMode] = useState<"frozen" | "hot">("frozen");
 const workStart = catalog?.work_start_hour ?? 10;
 const workEnd = catalog?.work_end_hour ?? 22;
+function switchMode(m: "frozen" | "hot") { setMode(m); setActiveCatId(null); window.scrollTo({ top: 0 }); }
+const theme = { ...DEFAULT_THEME, ...catalog?.theme };
 const currency = catalog?.currency ?? "₽";
 const freeFrom = catalog?.free_delivery_from ?? 0;
 const bizPhone = catalog?.phone ?? "";
@@ -375,6 +436,21 @@ const isScheduledTimeInFuture =
   }, [isWorkingHours, deliveryMode]);
 
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('cart') === 'open') {
+      setShowCart(true);
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+    if (new URLSearchParams(window.location.search).get('discounts') === '1') {
+      scrollToDiscountsRef.current = true;
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+    if (new URLSearchParams(window.location.search).get('where') === 'buy') {
+      setShowWhereToBuy(true);
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
+
+  useEffect(() => {
     const tg = window.Telegram?.WebApp;
     if (tg) {
       tg.ready();
@@ -392,20 +468,22 @@ const isScheduledTimeInFuture =
       .then((r) => r.ok ? r.json() : null)
       .then((data: WhereToBuyContent | null) => { if (data) setWhereToBuy(data); })
       .catch(() => {});
-    fetch(`${API_BASE}/api/content/prepared-on-request`)
-      .then((r) => r.ok ? r.json() : null)
-      .then((data: PreparedOnRequestContent | null) => { setPreparedOnRequest(data?.visible ? data : null); })
-      .catch(() => { setPreparedOnRequest(null); });
     fetch(`${API_BASE}/api/content/for-business`)
       .then((r) => r.ok ? r.json() : null)
       .then((data: { enabled?: boolean } | null) => { setForBusinessEnabled(data?.enabled ?? false); })
       .catch(() => { setForBusinessEnabled(false); });
-  }, [API_BASE]);
+    loadPromotions();
+  }, [API_BASE, loadPromotions]);
+
+  useEffect(() => {
+    if (showPromos) loadPromotions();
+  }, [showPromos, loadPromotions]);
 
   useEffect(() => {
     const refresh = () => {
       if (document.visibilityState !== 'visible') return;
       fetch(`${API_BASE}/api/catalog`, { cache: 'no-store' }).then(r => r.json()).then((data: Catalog) => setCatalog(data)).catch(() => {});
+      loadPromotions();
     };
     refresh();
     const interval = setInterval(refresh, 12000);
@@ -416,7 +494,7 @@ const isScheduledTimeInFuture =
       document.removeEventListener('visibilitychange', refresh);
       window.removeEventListener('focus', refresh);
     };
-  }, [API_BASE]);
+  }, [API_BASE, loadPromotions]);
 
   useEffect(() => {
     const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
@@ -446,6 +524,7 @@ const isScheduledTimeInFuture =
     const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
     if (!tgUser?.id) applyLocalContact();
   }, []);
+
 
   useEffect(() => {
     if (!orderSent) return;
@@ -478,6 +557,14 @@ const isScheduledTimeInFuture =
     setResult(prev => (prev && !prev.ok ? null : prev));
   }, [cart]);
 
+
+  useEffect(() => {
+    if (!showAllCategories) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setShowAllCategories(false); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [showAllCategories]);
+
   const addToCart = useCallback((item: CatalogItem) => {
     fetch(`${API_BASE}/api/track/cart_add?tg_user_id=${tgUserId || 0}${testQ}&channel=${channel}&user_key=${encodeURIComponent(userKey)}`, { method: "POST" }).catch(() => {});
     setCart((prev) => {
@@ -486,10 +573,27 @@ const isScheduledTimeInFuture =
     });
   }, [API_BASE]);
 
+  const addHotToCart = (item: CatalogItem) => {
+    fetch(`${API_BASE}/api/track/cart_add?tg_user_id=${tgUserId || 0}${testQ}&channel=${channel}&user_key=${encodeURIComponent(userKey)}`, { method: "POST" }).catch(() => {});
+    setCart((prev) => {
+      const existing = prev[item.id];
+      return { ...prev, [item.id]: { item, qty: existing ? Math.max(existing.qty, 3) : 3 } };
+    });
+  };
+
   const changeQty = useCallback((id: string, delta: number) => {
     setCart((prev) => {
       const entry = prev[id];
       if (!entry) return prev;
+      if (entry.item._orderMode === "hot") {
+        if (delta > 0) {
+          const newQty = Math.max(entry.qty, 3) + delta;
+          return { ...prev, [id]: { ...entry, qty: newQty } };
+        } else {
+          if (entry.qty <= 3) { const copy = { ...prev }; delete copy[id]; return copy; }
+          return { ...prev, [id]: { ...entry, qty: entry.qty - 1 } };
+        }
+      }
       const newQty = entry.qty + delta;
       if (newQty <= 0) { const copy = { ...prev }; delete copy[id]; return copy; }
       return { ...prev, [id]: { ...entry, qty: newQty } };
@@ -499,17 +603,68 @@ const isScheduledTimeInFuture =
   const cartEntries = useMemo(() => Object.values(cart), [cart]);
   const cartCount = useMemo(() => cartEntries.reduce((s, e) => s + e.qty, 0), [cartEntries]);
   const cartTotal = useMemo(() => cartEntries.reduce((s, e) => s + e.item.price * e.qty, 0), [cartEntries]);
-  const allCategories = catalog?.categories ?? [];
+  const maxBonus = (bonusCard?.exists && bonusCard.available_balance > 0)
+    ? Math.min(bonusCard.available_balance, Math.floor(cartTotal * BONUS_MAX_REDEEM_PERCENT / 100))
+    : 0;
+  const pinReady = bonusPin.length === BONUS_PIN_LENGTH;
+  const bonusUse = (useBonusChecked && pinReady && maxBonus > 0) ? maxBonus : 0;
+  const totalAfterBonus = cartTotal - bonusUse;
+  const itemsWord = (n: number) => n % 10 === 1 && n % 100 !== 11 ? "товар" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? "товара" : "товаров";
+  const freeProgress = freeFrom > 0 ? Math.min(cartTotal / freeFrom, 1) : 0;
+  const scrollToDiscountsRef = useRef(false);
+  const discountItems = useMemo(() => {
+    if (!catalog) return [];
+    const src = mode === "hot" ? (catalog.hot_categories ?? []) : (catalog.categories ?? []);
+    return src.flatMap(c => c.items.filter(item => {
+      const p = Number(item.price), op = Number(item.old_price);
+      return item.promo_enabled === true ||
+        (item.old_price != null && Number.isFinite(op) && Number.isFinite(p) && op > p);
+    }).map(item => ({ ...item, catName: c.name, catId: c.id })));
+  }, [catalog, mode]);
+  useEffect(() => {
+    if (scrollToDiscountsRef.current && discountItems.length > 0) {
+      scrollToDiscountsRef.current = false;
+      setTimeout(() => scrollToSection(`section-${mode}-discounts`), 150);
+    }
+  }, [discountItems]);
+  const isCompactCart = typeof window !== "undefined" && window.innerWidth <= 480;
+  const hotMinNotMet = cartEntries.some(e => e.item._orderMode === "hot" && e.qty < 3);
+  const hasHotCategories = (catalog?.hot_categories?.length ?? 0) > 0;
 
-  const PREPARED_CAT_IDS = ["pelmeni", "manty", "farsh", "shashlik"];
-  const preparedCtaCats = allCategories.filter(cat => PREPARED_CAT_IDS.includes(cat.id));
-  const itemsForCat = (cat: Category) =>
-    PREPARED_CAT_IDS.includes(cat.id)
-      ? cat.items
-      : cat.items.filter(it => !!it.prepared_item_id);
+  const visibleDisplayCategories = useMemo(() => {
+    if (!catalog) return [];
+    const srcMap = new Map<string, Category>();
+    for (const cat of (catalog.categories ?? [])) srcMap.set(cat.id, cat);
+    for (const cat of (catalog.hot_categories ?? [])) srcMap.set(cat.id, cat);
+    return DISPLAY_CATEGORIES.flatMap(dc => {
+      const ids = mode === "hot" ? dc.hotIds : dc.frozenIds;
+      const sourceCats = ids.map(id => srcMap.get(id)).filter(Boolean) as Category[];
+      const items: DisplayItem[] = sourceCats.flatMap(c => c.items.map(it => ({ ...it, _srcCatId: c.id })));
+      if (items.length === 0) return [];
+      return [{ key: dc.key, label: dc.label, emoji: dc.emoji, items, frozenIds: dc.frozenIds }];
+    });
+  }, [catalog, mode]);
 
-  const [, setPorCategoryId] = useState<string | null>(null);
-  const [porExpandedCats, setPorExpandedCats] = useState<Set<string>>(new Set());
+  const scrollingRef = useRef(false);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (scrollingRef.current) return;
+      const anchorY = window.scrollY + 140;
+      let activeKey: string | null = null;
+      for (const dc of visibleDisplayCategories) {
+        const el = document.getElementById(`section-${mode}-${dc.key}`);
+        if (!el) continue;
+        const top = el.getBoundingClientRect().top + window.scrollY;
+        const bottom = top + el.offsetHeight;
+        if (top <= anchorY && bottom > anchorY) { activeKey = dc.key; break; }
+      }
+      setActiveCatId(activeKey);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [mode, visibleDisplayCategories]);
 
   const POPULAR_IDS = ["h1", "p1", "s1", "o2"];
   const popularItems = useMemo(() => {
@@ -525,6 +680,33 @@ const isScheduledTimeInFuture =
 
   const IMAGE_POS: Record<string, string> = { o1: "center 70%", k3: "center 35%", p1: "center 30%" };
 
+  useEffect(() => {
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length < 10) {
+      setBonusCard(null);
+      setUseBonusChecked(false);
+      setBonusPin("");
+      return;
+    }
+    setBonusLoading(true);
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetch(`${API_BASE}/api/bonus-card?phone=${encodeURIComponent(phone.trim())}`, { signal: controller.signal })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { setBonusCard(data ?? null); })
+        .catch(() => {})
+        .finally(() => setBonusLoading(false));
+    }, 600);
+    return () => { clearTimeout(timer); controller.abort(); setBonusLoading(false); };
+  }, [phone, API_BASE]);
+
+  useEffect(() => {
+    if (maxBonus === 0) {
+      setUseBonusChecked(false);
+      setBonusPin("");
+    }
+  }, [maxBonus]);
+
   async function submitOrder() {
     if (cartEntries.length === 0 || !address.trim()) return;
     setSending(true);
@@ -538,13 +720,17 @@ const isScheduledTimeInFuture =
       total_rub: cartTotal,
       delivery_mode: deliveryMode,
       scheduled_for: deliveryMode === "SCHEDULED" && deliveryTime ? deliveryTime : null,
+      order_mode: (() => { const h = cartEntries.some(e => e.item._orderMode === "hot"); const f = cartEntries.some(e => e.item._orderMode !== "hot"); return h && f ? "mixed" : h ? "hot" : "frozen"; })(),
       items: cartEntries.map((e) => ({
         id: e.item.id,
         name: e.item.category ? `${e.item.category}: ${e.item.name}` : e.item.name,
         qty: e.qty,
         price_rub: e.item.price,
         unit: e.item.unit,
+        item_order_mode: e.item._orderMode ?? "frozen",
       })),
+      bonus_use: bonusUse,
+      bonus_pin: bonusUse > 0 ? bonusPin : undefined,
     };
 
     try {
@@ -594,6 +780,9 @@ window.history.replaceState(null, '', _u.toString());
         setComment("");
         setDeliveryMode(isWorkingHours ? "ASAP" : "SCHEDULED");
         setDeliveryTime("");
+        setUseBonusChecked(false);
+        setBonusPin("");
+        setBonusCard(null);
       }
     } catch (e: any) {
       setResult({ ok: false, text: `Ошибка сети: ${e.message}` });
@@ -697,130 +886,270 @@ window.history.replaceState(null, '', _u.toString());
   return (
     <div style={S.app} className="rp-app">
       <style>{`
+        :root {
+          --theme-primary: ${theme.primary};
+          --theme-cta: ${theme.cta};
+          --theme-bg-page: ${theme.bg_page};
+          --theme-bg-surface: ${theme.bg_surface};
+          --theme-bg-chip: ${theme.bg_chip};
+          --theme-text-primary: ${theme.text_primary};
+          --theme-text-secondary: ${theme.text_secondary};
+          --theme-border: ${theme.border};
+          --theme-accent-announcement: ${theme.accent_announcement};
+        }
         .rp-app { max-width: 100%; }
         @media (min-width: 640px)  { .rp-app { max-width: 760px;  margin: 0 auto; } }
         @media (min-width: 900px)  { .rp-app { max-width: 980px;  } }
         @media (min-width: 1280px) { .rp-app { max-width: 1100px; } }
-        .rp-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; margin: 0 auto; }
-        @media (min-width: 900px)  { .rp-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 580px; } }
-        @media (min-width: 900px)  { .rp-sections-btn { display: none; } }
-        .rp-chips { display: none; }
-        @media (min-width: 900px)  { .rp-chips { display: flex; } }
-        .rp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        @media (min-width: 640px)  { .rp-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-        @media (min-width: 900px)  { .rp-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-        @media (min-width: 640px)  { .rp-bottom { left: 50%; transform: translateX(-50%); width: 760px;  right: auto; } }
-        @media (min-width: 900px)  { .rp-bottom { width: 980px;  } }
-        @media (min-width: 1280px) { .rp-bottom { width: 1100px; } }
+        .rp-hdr-wrap { position: sticky; top: 0; z-index: 100; background: var(--tg-theme-bg-color, #f7f5f2); border-bottom: 1px solid var(--theme-border, #e2ddd6); }
+        @media (max-width: 899px) { .rp-hdr-wrap { position: static; display: contents; border-bottom: none; } }
+        .rp-hdr { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .rp-hdr-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+        @media (max-width: 899px) { .rp-hdr { flex-direction: column; gap: 10px; align-items: center; } }
+        @media (max-width: 899px) { .rp-hdr-right { width: 100%; align-items: flex-start; } }
+        @media (max-width: 899px) { .rp-subtitle { margin-top: 2px; line-height: 1.15; } }
+        .rp-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 16px 10px; }
+        @media (max-width: 767px) { .rp-chips { flex-wrap: nowrap; } }
+        .rp-chip { display: inline-flex; align-items: center; height: 42px; padding: 0 12px; border-radius: 12px; border: none; cursor: pointer; font-size: 14px; font-weight: 500; white-space: nowrap; flex-shrink: 0; transition: background .15s, color .15s; }
+        @media (max-width: 767px) { .rp-chip { height: 40px; padding: 0 10px; font-size: 13px; } }
+        @media (max-width: 767px) { .rp-chip-hidden-mobile { display: none !important; } }
+        .rp-chip-all { display: none !important; }
+        @media (max-width: 767px) { .rp-chip-all { display: inline-flex !important; } }
+        .rp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+        @media (min-width: 480px)  { .rp-grid { gap: 12px; } }
+        @media (min-width: 768px)  { .rp-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } }
+        @media (min-width: 1024px) { .rp-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+        .rp-logo { width: 44px; height: 44px; }
+        @media (min-width: 768px) { .rp-logo { width: 80px; height: 80px; } }
+        .rp-subtitle { font-size: 12px; color: var(--theme-text-primary, #3a2e28); opacity: 0.6; margin-top: 4px; line-height: 1.3; }
+        @media (min-width: 768px) { .rp-subtitle { font-size: 14px; } }
+        .rp-shopname { font-size: 23px; }
+        @media (min-width: 768px) { .rp-shopname { font-size: 30px; } }
+        .rp-hdr-btns { width: 100%; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+        .rp-hdr-btn { display: flex; align-items: center; justify-content: center; height: 42px; padding: 0 12px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; white-space: nowrap; text-decoration: none; }
+        @media (min-width: 900px) { .rp-hdr-btn { height: 36px; font-size: 13px; padding: 0 14px; border-radius: 20px; border: 1px solid var(--theme-border, #e2ddd6); background: var(--tg-theme-bg-color, #fff); color: var(--theme-text-primary, #3a2e28); } }
+        @media (min-width: 900px) { .rp-hdr-right { flex-direction: row; align-items: center; gap: 28px; } }
+        @media (min-width: 900px) { .rp-secondary-nav { padding-top: 0; flex-wrap: nowrap; } }
+        @media (min-width: 900px) { .rp-hdr-btns { flex-wrap: nowrap; width: auto; } }
+        @media (min-width: 900px) { .rp-desktop-only { display: inline-block !important; } }
+        .rp-secondary-nav { display: flex; gap: 14px; flex-wrap: wrap; justify-content: flex-end; padding-top: 4px; }
+        .rp-secondary-nav button, .rp-secondary-nav a { background: none; border: none; border-bottom: 1.5px solid transparent; cursor: pointer; font-size: 14px; font-weight: 600; font-family: inherit; padding: 0 0 2px; color: var(--theme-text-primary, #3a2e28); text-decoration: none; transition: border-color .15s; white-space: nowrap; }
+        .rp-secondary-nav button:hover, .rp-secondary-nav a:hover { border-bottom-color: var(--theme-primary, #8B2A1F); }
+        .rp-desktop-only { display: none !important; }
+        @media (min-width: 768px) { .rp-desktop-only { display: inline !important; } }
+        .rp-mode-switch { display: flex; padding: 8px 16px 2px; }
+        .rp-mode-btn { padding: 7px 18px; border: 1px solid var(--theme-border, #e2ddd6); background: none; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--theme-text-secondary, #8a7a6f); transition: background .15s, color .15s; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+        .rp-mode-btn:first-child { border-radius: 8px 0 0 8px; }
+        .rp-mode-btn:last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
+        .rp-mode-btn.rp-mode-active { background: var(--theme-primary, #8B2A1F); color: #fff; border-color: var(--theme-primary, #8B2A1F); z-index: 1; position: relative; }
+        /* ── desktop: header row alignment ── */
+        @media (min-width: 900px) { .rp-hdr { align-items: center; } }
+        /* ── mode-switch + chips в одну строку на desktop ── */
+        .rp-mode-cats { display: flex; flex-direction: column; }
+        @media (max-width: 899px) { .rp-mode-cats { position: sticky; top: 0; z-index: 100; background: var(--tg-theme-bg-color, #f7f5f2); border-bottom: 1px solid var(--theme-border, #e2ddd6); margin-top: -6px; padding-top: 6px; box-sizing: border-box; } }
+        @media (min-width: 900px) {
+          .rp-mode-cats { flex-direction: row; align-items: center; padding: 6px 16px; gap: 8px; border-top: 1px solid var(--theme-border,#e2ddd6); margin-top: 2px; }
+          .rp-mode-cats .rp-mode-switch { padding: 0; flex-shrink: 0; padding-right: 14px; border-right: 1px solid var(--theme-border,#e2ddd6); margin-right: 4px; }
+          .rp-mode-cats .rp-mode-btn { padding: 12px 24px; font-size: 15px; }
+          .rp-mode-cats .rp-chips { padding: 0; flex: 1; min-width: 0; }
+          .rp-mode-cats .rp-chip { height: 34px; font-size: 13px; }
+        }
+        /* ── advantages strip — только desktop ── */
+        @media (max-width: 767px) { .rp-adv-strip { display: none; } }
+        .rp-adv-strip { display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 6px 16px 10px; }
+        .rp-adv-item { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--theme-text-secondary,#8a7a6f); white-space: nowrap; }
+        /* ── popular section title ── */
+        .rp-pop-title { font-size: 17px; font-weight: 700; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--theme-border,#e2ddd6); letter-spacing: 0; }
+        @media (min-width: 768px) { .rp-pop-title { font-size: 20px; } }
+        /* ── add button: blue fill на desktop ── */
+        @media (min-width: 900px) { .rp-add-btn { background: #3390ec !important; color: #fff !important; border: none !important; } }
+        /* ── promo discount section ── */
+        .rp-promo-section-title { font-size: 20px; font-weight: 700; color: var(--theme-text-primary,#3a2e28); margin-top: 22px; margin-bottom: 14px; }
+        .rp-promo-mode-header { margin-bottom: 10px; }
+        .rp-promo-mode-title { font-size: 16px; font-weight: 700; color: var(--theme-text-primary,#3a2e28); }
+        .rp-promo-item-card { display: flex; align-items: center; gap: 14px; background: rgba(255,255,255,.55); border: 1px solid rgba(139,42,31,.11); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; }
+        /* ── promo banner ── */
+        .rp-promo-banner { margin: 0 -16px 18px; width: calc(100% + 32px); }
+        .rp-promo-banner img { display: block; width: 100%; height: auto; border-radius: 0; }
+        /* ── B2B block — mobile only ── */
+        .rp-b2b-wrap { display: none; }
+        @media (max-width: 899px) {
+          .rp-b2b-wrap { display: block; margin: 12px 16px 8px; }
+          .rp-b2b-inner { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 14px; border-radius: 18px; background: linear-gradient(135deg,#fdf6ef 0%,#f5ede2 100%); border: 1px solid rgba(139,42,31,.15); text-decoration: none; color: inherit; }
+          .rp-b2b-body { flex: 1; min-width: 0; }
+          .rp-b2b-title { font-size: 16px; font-weight: 700; line-height: 1.2; margin-bottom: 6px; color: var(--theme-text-primary,#3a2e28); }
+          .rp-b2b-sub { font-size: 13px; opacity: .7; line-height: 1.4; margin-bottom: 0; }
+          .rp-b2b-cta { align-self: flex-start; padding: 10px 16px; border-radius: 999px; background: rgba(139,42,31,.08); color: var(--theme-primary,#8B2A1F); border: 1px solid rgba(139,42,31,.2); font-size: 14px; font-weight: 700; white-space: nowrap; }
+          /* ── trust reviews block ── */
+          .rp-trust-inner { display: flex; flex-direction: column; gap: 7px; padding: 12px 14px; border-radius: 16px; background: linear-gradient(135deg,#fdf6ef 0%,#f5ede2 100%); border: 1px solid rgba(139,42,31,.15); }
+          .rp-trust-title { font-size: 15px; font-weight: 700; color: var(--theme-text-primary,#3a2e28); }
+          .rp-trust-quote { font-size: 13px; line-height: 1.4; color: var(--theme-text-primary,#3a2e28); }
+          .rp-trust-stars { color: #FFB800; }
+          .rp-trust-author { font-style: italic; opacity: .6; margin-left: 4px; }
+          .rp-trust-link { align-self: flex-start; font-size: 13px; font-weight: 700; color: var(--theme-primary,#8B2A1F); text-decoration: none; margin-top: 2px; }
+        }
+        /* ── mobile header layout ── */
+        @media (max-width: 899px) { .rp-secondary-nav { display: none; } }
+        .rp-sections-trigger { display: none !important; }
+        @media (max-width: 899px) { .rp-sections-trigger { display: flex !important; } }
+        @media (max-width: 899px) { .rp-hdr-btn-wheretobuy { display: none !important; } }
+        @media (max-width: 899px) { .rp-hdr-btns { flex-wrap: nowrap; width: 100%; gap: 8px; } .rp-hdr-btns .rp-hdr-btn { flex: 1; display: flex; align-items: center; justify-content: center; height: 42px; min-width: 0; padding: 0 6px; border-radius: 8px; font-size: 12px; font-weight: 500; font-family: inherit; line-height: 1; white-space: nowrap; box-sizing: border-box; -webkit-appearance: none; appearance: none; text-decoration: none; background: var(--theme-bg-chip, #ede8e0) !important; color: var(--theme-text-primary, #3a2e28) !important; border: 1px solid var(--theme-border, #e2ddd6) !important; } }
+        .rp-hdr-right { position: relative; }
+        .rp-sections-menu { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--tg-theme-bg-color, #fff); border: 1px solid var(--theme-border,#e2ddd6); border-radius: 12px; z-index: 200; box-shadow: 0 4px 20px rgba(0,0,0,.12); overflow: hidden; }
+        .rp-sections-menu button, .rp-sections-menu a { display: flex; align-items: center; width: 100%; padding: 13px 16px; background: none; border: none; border-bottom: 1px solid var(--theme-border,#e2ddd6); cursor: pointer; font-size: 15px; font-weight: 500; color: var(--theme-text-primary,#3a2e28); font-family: inherit; text-decoration: none; gap: 10px; box-sizing: border-box; }
+        .rp-sections-menu button:last-child, .rp-sections-menu a:last-child { border-bottom: none; }
+        @media (max-width: 899px) { .rp-mode-switch { width: 100%; box-sizing: border-box; overflow: hidden; padding-top: 2px; } .rp-mode-btn { flex: 1; min-width: 0; justify-content: center; padding: 8px 4px; line-height: 1; } }
+        .rp-mode-btn-frozen.rp-mode-active { background: #607b9b; border-color: #607b9b; color: #fff; }
+        @media (max-width: 899px) { .rp-mode-cats .rp-chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 4px 16px 10px; margin-top: 4px; } }
+        @media (max-width: 899px) { .rp-mode-cats .rp-chips .rp-chip { width: 100%; min-width: 0; justify-content: center; padding: 0 8px; box-sizing: border-box; height: 40px; flex-shrink: unset; overflow: hidden; } }
+        @media (max-width: 899px) { .rp-mode-cats .rp-chips .rp-chip-all { display: flex !important; } }
+        @media (max-width: 899px) { #section-popular { padding-top: 10px !important; } }
+        @media (max-width: 899px) { #section-popular .rp-pop-title { border-bottom: none; padding-bottom: 0; margin-bottom: 10px; } }
       `}</style>
       {isTest && <div style={{position:'fixed',top:0,left:0,right:0,zIndex:9999,background:'#ff3b30',color:'#fff',fontSize:11,fontWeight:700,textAlign:'center' as const,padding:'3px 0',letterSpacing:'1px'}}>ТЕСТОВЫЙ РЕЖИМ</div>}
       {freeFrom > 0 && (
         <div style={{
-          background: "#2d1f0e", color: "#f5e9d6",
+          background: theme.accent_announcement, color: "#f5e9d6",
           fontSize: 12, fontWeight: 500, textAlign: "center" as const,
           padding: "7px 16px", letterSpacing: "0.2px", lineHeight: 1.4,
         }}>
           По Саракташу — бесплатно от {freeFrom}₽ · принимаем заказы {workStart}:00–{workEnd}:00
         </div>
       )}
+      {showSectionsMenu && <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowSectionsMenu(false)} />}
+      <div className="rp-hdr-wrap">
       <div style={S.header}>
-        <h1 style={S.shopName}>{catalog.shop_name}</h1>
-        <p style={{ margin: "0 0 10px", fontSize: 13, opacity: 0.55, lineHeight: 1.4 }}>
-          Домашние полуфабрикаты ручной лепки
-        </p>
-        {(() => {
-          const btnInner: React.CSSProperties = {
-            display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 8,
-            width: "100%", boxSizing: "border-box", minWidth: 0, overflow: "hidden",
-            padding: "7px 12px", borderRadius: 8, border: "none", cursor: "pointer",
-            minHeight: 44, textDecoration: "none",
-            background: tgVar("secondary-bg-color", "#e2ddd6"),
-            color: tgVar("text-color", "#1a1a1a"),
-            fontSize: 13, fontWeight: 600,
-          };
-          const txt = (s: string) => (
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s}</span>
-          );
-          const ico = (s: string) => (
-            <span style={{ width: 20, textAlign: "center" as const, flexShrink: 0 }}>{s}</span>
-          );
-          return (
-            <div style={{ display: "grid", gap: 8, marginBottom: 10 }} className="rp-nav">
-
-              <div style={{ minWidth: 0, position: "relative" }} ref={sectionsRef} className="rp-sections-btn">
-                <button onClick={() => setShowSections(v => !v)} style={btnInner}>{ico("☰")}{txt("Разделы")}</button>
-                {showSections && (
-                  <div style={{
-                    position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0,
-                    background: tgVar("bg-color", "#ffffff"), borderRadius: 12,
-                    boxShadow: "0 4px 20px rgba(0,0,0,0.12)", padding: "6px 0",
-                    zIndex: 100, maxWidth: 260,
-                  }}>
-                    <button
-                      onClick={() => scrollToSection("section-popular")}
-                      style={{ display: "block", width: "100%", padding: "10px 16px", border: "none", background: "none", textAlign: "left" as const, fontSize: 14, cursor: "pointer", color: tgVar("text-color", "#1a1a1a") }}
-                    >⭐ Популярное</button>
-                    {allCategories.map((cat) => (
-                      <button
-                        key={cat.id}
-                        onClick={() => scrollToSection(`section-${cat.id}`)}
-                        style={{ display: "block", width: "100%", padding: "10px 16px", border: "none", background: "none", textAlign: "left" as const, fontSize: 14, cursor: "pointer", color: tgVar("text-color", "#1a1a1a") }}
-                      >
-                        <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1 }}>
-                          <span>{cat.emoji} {cat.name}</span>
-                          {PREPARED_CAT_IDS.includes(cat.id) && preparedOnRequest && (
-                            <span style={{ fontSize: 11, color: "#9a7a5a", lineHeight: 1.3 }}>можно в готовом виде</span>
-                          )}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div style={{ minWidth: 0 }}>
-                <button onClick={() => setShowWhereToBuy(true)} style={btnInner}>{ico("📍")}{txt("Где купить")}</button>
-              </div>
-
-              {bizPhone && (
-                <div style={{ minWidth: 0 }}>
-                  <a href={`tel:${bizPhone}`} style={btnInner}>{ico("📞")}{txt("Позвонить")}</a>
-                </div>
-              )}
-
-              {bizPhone && (
-                <div style={{ minWidth: 0 }}>
-                  <a href="https://max.ru/join/FZnl85uOe410NmUxA0dDMyFYf90-aJkBOweY_tPkUr4" target="_blank" rel="noreferrer" style={btnInner}>{ico("💬")}{txt("Чат MAX")}</a>
-                </div>
-              )}
-
+        <div className="rp-hdr">
+          {/* БРЕНД */}
+          <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+            <img src="/images/logo-512.png" alt="" className="rp-logo" style={{ flexShrink: 0, objectFit: "cover" }} />
+            <div style={{ minWidth: 0 }}>
+              <h1 style={{ ...S.shopName, margin: 0 }} className="rp-shopname">{catalog.shop_name}</h1>
+              {catalog.shop_subtitle && <div className="rp-subtitle">{catalog.shop_subtitle}</div>}
             </div>
-          );
-        })()}
+          </div>
+
+          {/* ДЕЙСТВИЯ */}
+          <div className="rp-hdr-right">
+            {/* Вторичная навигация (desktop) */}
+            <div className="rp-secondary-nav">
+              <a href="about.html">О нас</a>
+              <a href="reviews.html">Отзывы</a>
+              {forBusinessEnabled && <a href="business.html" className="rp-desktop-only">Для бизнеса</a>}
+              <a href="promo.html">🏷️ Акции</a>
+            </div>
+            {/* Утилитарные действия */}
+            <div className="rp-hdr-btns">
+              <button className="rp-hdr-btn rp-sections-trigger" style={{ background: tgVar("secondary-bg-color", theme.bg_chip), color: tgVar("text-color", theme.text_primary) }} onClick={() => setShowSectionsMenu(v => !v)}>☰ Разделы</button>
+              <a href="where.html" className="rp-hdr-btn rp-hdr-btn-wheretobuy" style={{ background: tgVar("secondary-bg-color", theme.bg_chip), color: tgVar("text-color", theme.text_primary) }}>📍 Где купить</a>
+              {bizPhone && <a href={`tel:${bizPhone}`} className="rp-hdr-btn" style={{ background: tgVar("secondary-bg-color", theme.bg_chip), color: tgVar("text-color", theme.text_primary) }}>📞 Позвонить</a>}
+              {bizPhone && <a href="https://max.ru/join/FZnl85uOe410NmUxA0dDMyFYf90-aJkBOweY_tPkUr4" target="_blank" rel="noreferrer" className="rp-hdr-btn" style={{ background: tgVar("secondary-bg-color", theme.bg_chip), color: tgVar("text-color", theme.text_primary) }}>💬 Чат MAX</a>}
+            </div>
+            {showSectionsMenu && (
+              <div className="rp-sections-menu">
+                <a href="where.html" onClick={() => setShowSectionsMenu(false)}>📍 Где купить</a>
+                <a href="promo.html" onClick={() => setShowSectionsMenu(false)}>🏷️ Акции</a>
+                <a href="about.html" onClick={() => setShowSectionsMenu(false)}>ℹ️ О нас</a>
+                <a href="reviews.html" onClick={() => setShowSectionsMenu(false)}>⭐ Отзывы</a>
+                {forBusinessEnabled && <a href="business.html" onClick={() => setShowSectionsMenu(false)}>🏪 Для магазинов</a>}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div style={{ gap: 8, overflowX: "auto", padding: "6px 16px 6px", scrollbarWidth: "none" as const }} className="rp-chips">
-        {popularItems.length > 0 && (
+      {catalog.banner?.enabled && !bannerDismissed && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10,
+          padding: "10px 14px", margin: "0 0 0 0",
+          background: "#fdf3f2", borderBottom: "1px solid #f5c6c2",
+        }}>
+          <span style={{ fontSize: 20, flexShrink: 0 }}>{catalog.banner.icon}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {catalog.banner.badge && (
+              <span style={{ fontSize: 10, fontWeight: 700, background: theme.primary, color: "#fff", padding: "2px 6px", borderRadius: 999, marginRight: 6, verticalAlign: "middle" }}>
+                {catalog.banner.badge}
+              </span>
+            )}
+            <span style={{ fontSize: 13, fontWeight: 500, color: "#1a1a1a" }}>{catalog.banner.title}</span>
+          </div>
+          {catalog.banner.button_text && (
+            <button
+              onClick={() => {
+                if (catalog.banner?.button_target === 'prepared-form' || catalog.banner?.button_target === 'hot-menu') {
+                  switchMode("hot");
+                } else if (catalog.banner?.button_target) {
+                  scrollToSection(catalog.banner.button_target);
+                }
+              }}
+              style={{ flexShrink: 0, padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, background: theme.cta, color: "#fff" }}
+            >{catalog.banner.button_text}</button>
+          )}
           <button
-            onClick={() => scrollToSection("section-popular")}
-            style={{ padding: "5px 12px", borderRadius: 20, border: "none", cursor: "pointer", whiteSpace: "nowrap" as const, fontSize: 12, fontWeight: 400, flexShrink: 0, background: tgVar("secondary-bg-color", "#e2ddd6"), color: tgVar("text-color", "#1a1a1a") }}
-          >⭐ Популярное</button>
+            onClick={() => { try { localStorage.setItem('banner_hot_dismissed', '1'); } catch {} setBannerDismissed(true); }}
+            style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", fontSize: 20, lineHeight: 1, color: "#999", padding: "4px" }}
+            aria-label="Закрыть"
+          >×</button>
+        </div>
+      )}
+
+
+      <div className="rp-mode-cats">
+      {hasHotCategories && (
+        <div className="rp-mode-switch">
+          <button className={`rp-mode-btn rp-mode-btn-frozen${mode === "frozen" ? " rp-mode-active" : ""}`} onClick={() => switchMode("frozen")}><svg width="19" height="19" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{flexShrink:0}}><line x1="8" y1="2.5" x2="8" y2="13.5"/><line x1="12.8" y1="5.3" x2="3.2" y2="10.7"/><line x1="12.8" y1="10.7" x2="3.2" y2="5.3"/><line x1="8" y1="4.3" x2="9.3" y2="3.5"/><line x1="8" y1="4.3" x2="6.7" y2="3.5"/><line x1="8" y1="11.7" x2="9.3" y2="12.5"/><line x1="8" y1="11.7" x2="6.7" y2="12.5"/><line x1="11.2" y1="6.2" x2="12.5" y2="7.0"/><line x1="11.2" y1="6.2" x2="11.2" y2="4.7"/><line x1="4.8" y1="6.2" x2="4.8" y2="4.7"/><line x1="4.8" y1="6.2" x2="3.5" y2="7.0"/><line x1="11.2" y1="9.8" x2="11.2" y2="11.3"/><line x1="11.2" y1="9.8" x2="12.5" y2="9.1"/><line x1="4.8" y1="9.8" x2="3.5" y2="9.1"/><line x1="4.8" y1="9.8" x2="4.8" y2="11.3"/></svg>Заморозка</button>
+          <button className={`rp-mode-btn${mode === "hot" ? " rp-mode-active" : ""}`} onClick={() => switchMode("hot")}>🔥 Горячее</button>
+        </div>
+      )}
+      <div className="rp-chips">
+        {discountItems.length > 0 && (
+          <button
+            className="rp-chip"
+            onClick={() => {
+              scrollingRef.current = true;
+              if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+              scrollTimeoutRef.current = setTimeout(() => { scrollingRef.current = false; }, 700);
+              setActiveCatId("discounts");
+              scrollToSection(`section-${mode}-discounts`);
+            }}
+            style={{
+              background: activeCatId === "discounts" ? theme.cta : tgVar("secondary-bg-color", theme.bg_chip),
+              color: activeCatId === "discounts" ? tgVar("button-text-color", "#ffffff") : tgVar("text-color", "#1a1a1a"),
+            }}
+          >Со скидкой</button>
         )}
-        {allCategories.map(cat => (
+        {visibleDisplayCategories.map((dc, i) => (
           <button
-            key={cat.id}
-            onClick={() => scrollToSection(`section-${cat.id}`)}
-            style={{ padding: "5px 12px", borderRadius: 20, border: "none", cursor: "pointer", whiteSpace: "nowrap" as const, fontSize: 12, fontWeight: 400, flexShrink: 0, background: tgVar("secondary-bg-color", "#e2ddd6"), color: tgVar("text-color", "#1a1a1a") }}
-          >{cat.emoji} {cat.name}</button>
+            key={dc.key}
+            className={`rp-chip${i >= (discountItems.length > 0 ? 2 : 3) ? ' rp-chip-hidden-mobile' : ''}`}
+            onClick={() => { scrollingRef.current = true; if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current); scrollTimeoutRef.current = setTimeout(() => { scrollingRef.current = false; }, 700); setActiveCatId(dc.key); scrollToSection(`section-${mode}-${dc.key}`); }}
+            style={{
+              background: activeCatId === dc.key ? theme.cta : tgVar("secondary-bg-color", theme.bg_chip),
+              color: activeCatId === dc.key ? tgVar("button-text-color", "#ffffff") : tgVar("text-color", "#1a1a1a"),
+            }}
+          >{(mode === "hot" && HOT_LABELS[dc.key]) || dc.label}</button>
         ))}
+        <button
+          className="rp-chip rp-chip-all"
+          onClick={() => setShowAllCategories(true)}
+          style={{ background: tgVar("secondary-bg-color", theme.bg_chip), color: tgVar("text-color", theme.text_primary) }}
+        >Ещё</button>
       </div>
+      </div>{/* /rp-mode-cats */}
 
-      {popularItems.length > 0 && (
+      </div>{/* /rp-hdr-wrap */}
+
+      {popularItems.length > 0 && mode === "frozen" && (
         <div id="section-popular" style={S.section}>
-          <div style={{ fontSize: 18, fontWeight: 700, margin: "4px 0 14px", letterSpacing: 0 }}>⭐ Популярное</div>
-          <div style={{ display: "grid", gap: 8 }} className="rp-grid">
+          <div className="rp-pop-title">⭐ Популярное</div>
+          <div className="rp-grid">
             {popularItems.map((item) => {
               const inCart = cart[item.id];
+              const hasPromo = Boolean(item.promo_enabled);
+              const promoLabel = item.promo_label?.trim() || "Акция";
+              const oldPriceNum = Number(item.old_price);
+              const priceNum = Number(item.price);
+              const hasOldPrice = Number.isFinite(oldPriceNum) && Number.isFinite(priceNum) && oldPriceNum > priceNum;
               return (
                 <div key={item.id} style={{
                   display: "flex", flexDirection: "column" as const,
@@ -828,24 +1157,34 @@ window.history.replaceState(null, '', _u.toString());
                   overflow: "hidden",
                 }}>
                   <div style={{ position: "relative" }}>
-                    {item.image && (
+                    {item.image ? (
                       <img src={item.image} alt={item.name} style={{
                         width: "100%", aspectRatio: "3/2", objectFit: "cover", display: "block",
                         ...(IMAGE_POS[item.id] && { objectPosition: IMAGE_POS[item.id] }),
                       }} />
-                    )}
-                    {item.prepared_item_id && !PREPARED_CAT_IDS.includes(item.catId) && preparedOnRequest && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setPorCategoryId(item.catId); setPorExpandedCats(new Set([item.catId])); setPorQtys({ [item.id]: 1 }); setPorPhone(phone); setPorResult(null); setShowPreparedForm(true); }}
-                        style={{ position: "absolute", top: 8, left: 8, padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(90,57,35,0.10)", cursor: "pointer", background: "rgba(248,241,232,0.96)", color: "#5a3923", fontSize: 12, fontWeight: 700, lineHeight: 1, boxShadow: "0 2px 8px rgba(0,0,0,0.10)" }}
-                      >Можно готовым</button>
+                    ) : (
+                      <div style={{
+                        width: "100%", aspectRatio: "3/2", display: "flex",
+                        alignItems: "center", justifyContent: "center",
+                        background: "#f0ebe3", color: "#b0a898", fontSize: 11,
+                      }}>Фото скоро появится</div>
                     )}
                   </div>
                   <div style={{ padding: "8px 10px 10px", display: "flex", flexDirection: "column" as const, flex: 1 }}>
                     <div style={{ fontSize: 11, opacity: 0.4, marginBottom: 2, textTransform: "uppercase" as const, letterSpacing: "0.3px" }}>{item.catName}</div>
                     <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3, marginBottom: item.subtitle ? 2 : 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>{item.title ?? item.name}</div>
                     {item.subtitle && <div style={{ fontSize: 12, opacity: 0.5, marginBottom: 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical" as const }}>{item.subtitle}</div>}
-                    <div style={{ fontSize: 14, fontWeight: 600, opacity: 0.75, marginBottom: 8 }}>{item.price}{currency} / {item.unit}</div>
+                    {(hasPromo || hasOldPrice) ? (
+                      <div style={{ marginBottom: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", marginBottom: 2 }}>
+                          {hasPromo && <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", background: "#c0392b", borderRadius: 4, padding: "1px 5px" }}>{promoLabel}</span>}
+                          {hasOldPrice && <span style={{ fontSize: 12, opacity: 0.45, textDecoration: "line-through" }}>{item.old_price}{currency}</span>}
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: 600, opacity: 0.75, whiteSpace: "nowrap" }}>{item.price}{currency} / {item.unit}</div>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 14, fontWeight: 600, opacity: 0.75, marginBottom: 8, whiteSpace: "nowrap" }}>{item.price}{currency} / {item.unit}</div>
+                    )}
                     <div style={{ marginTop: "auto" }}>
                       {inCart ? (
                         <div style={{ ...S.qtyControls, justifyContent: "center" }}>
@@ -856,7 +1195,7 @@ window.history.replaceState(null, '', _u.toString());
                       ) : item.in_stock === false ? (
                         <div style={{ color: "#999", fontSize: 13, textAlign: "center" as const }}>Нет в наличии</div>
                       ) : (
-                        <button style={{ ...S.addBtn, width: "100%", padding: "7px 0", fontSize: 13 }} onClick={() => addToCart({ ...item, category: item.catName })}>+ Добавить</button>
+                        <button className="rp-add-btn" style={{ ...S.addBtn, width: "100%", padding: "7px 0", fontSize: 13 }} onClick={() => addToCart({ ...item, category: item.catName, _orderMode: "frozen" })}>+ Добавить</button>
                       )}
                     </div>
                   </div>
@@ -867,68 +1206,30 @@ window.history.replaceState(null, '', _u.toString());
         </div>
       )}
 
-      <div style={{ padding: "4px 16px 10px" }}>
-        <a
-          href="https://yandex.com/profile/90471460683?lang=ru&no-distribution=1&view-state=mini&source=wizbiz_new_map_single"
-          target="_blank" rel="noreferrer"
-          style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, textDecoration: "none" }}
-        >
-          <span style={{ color: "#f5a623", fontSize: 15, lineHeight: 1 }}>★</span>
-          <span style={{ fontSize: 14, fontWeight: 600, color: tgVar("text-color", "#1a1a1a") }}>4,5</span>
-          <span style={{ fontSize: 13, opacity: 0.5, color: tgVar("text-color", "#1a1a1a") }}>· 10 отзывов на Яндекс Картах</span>
-          <span style={{ fontSize: 13, opacity: 0.4, color: tgVar("text-color", "#1a1a1a") }}>→</span>
-        </a>
-        {([
-          { text: "Римские пельмени, манты — просто класс, по-домашнему. Всегда свежие, всем советую. Бесплатная доставка — большой плюс!", name: "Светлана Г." },
-          { text: "Хорошее качество, очень вкусные, тесто не разваривается. Были очень довольны, рекомендую, пельмени супер.", name: "Сергей К." },
-          { text: "Заказали пельмени, вареники и котлеты. Я просто в восторге! Держите марку также хорошо.", name: "Арсений К." },
-        ] as const).map(({ text, name }) => (
-          <div key={name} style={{
-            background: tgVar("secondary-bg-color", "#f7f5f2"),
-            borderRadius: 12, padding: "10px 12px", marginBottom: 8,
-          }}>
-            <div style={{ fontSize: 13, lineHeight: 1.5, marginBottom: 4 }}>«{text}»</div>
-            <div style={{ fontSize: 12, opacity: 0.45 }}>— {name}</div>
+      {mode === "frozen" && popularItems.length > 0 && (
+        <div className="rp-b2b-wrap">
+          <div className="rp-trust-inner">
+            <div className="rp-trust-title">Что говорят о нас</div>
+            <div className="rp-trust-quote"><span className="rp-trust-stars">★★★★★</span> «Хорошее качество, очень вкусные, тесто не разваривается. Очень довольны.»<span className="rp-trust-author">— Сергей</span></div>
+            <div className="rp-trust-quote"><span className="rp-trust-stars">★★★★★</span> «Вчера заказали пельмени, вареники и котлеты. Я просто в восторге!»<span className="rp-trust-author">— Арсений</span></div>
+            <a href="/reviews.html" className="rp-trust-link">Все отзывы →</a>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
-      {forBusinessEnabled && <div style={{ padding: "12px 16px 8px" }}>
-        <a href="business.html" style={{
-          display: "block", padding: "14px", borderRadius: 16,
-          background: "#faf7f0", border: "1px solid rgba(0,0,0,.12)",
-          textDecoration: "none", color: "#1a1a1a",
-        }}>
-          <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.25, marginBottom: 6 }}>
-            У вас магазин или точка?
-          </div>
-          <div style={{ fontSize: 13, opacity: 0.78, lineHeight: 1.35, marginBottom: 10 }}>
-            Поставляем пельмени ручной лепки и другие позиции.{" "}
-            Подскажем, с чего проще начать.
-          </div>
-          <div style={{
-            display: "inline-block", fontSize: 13, fontWeight: 600,
-            padding: "8px 14px", borderRadius: 20, background: "rgba(0,0,0,.08)",
-          }}>
-            Подробнее →
-          </div>
-        </a>
-      </div>}
-
-      {allCategories.map((cat) => (
-        <div key={cat.id} id={`section-${cat.id}`} style={S.section}>
+      {visibleDisplayCategories.map((dc) => (
+        <div key={dc.key} id={`section-${mode}-${dc.key}`} style={S.section}>
           <div style={{ ...S.sectionTitle, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const }}>
-            <span>{cat.emoji} {cat.name}</span>
-            {preparedCtaCats.some(pc => pc.id === cat.id) && preparedOnRequest && (
-              <button
-                onClick={() => { setPorCategoryId(cat.id); setPorExpandedCats(new Set([cat.id])); setPorQtys({}); setPorPhone(phone); setPorResult(null); setShowPreparedForm(true); }}
-                style={{ fontSize: 12, fontWeight: 600, padding: "5px 11px", borderRadius: 20, border: "none", cursor: "pointer", background: tgVar("secondary-bg-color", "#ede8e0"), color: tgVar("text-color", "#1a1a1a"), whiteSpace: "nowrap" as const }}
-              >Заказать готовым</button>
-            )}
+            <span>{dc.emoji} {(mode === "hot" && HOT_LABELS[dc.key]) || dc.label}</span>
           </div>
-          <div style={{ display: "grid", gap: 8 }} className="rp-grid">
-            {cat.items.map((item) => {
+          <div className="rp-grid">
+            {dc.items.map((item) => {
               const inCart = cart[item.id];
+              const hasPromo = Boolean(item.promo_enabled);
+              const promoLabel = item.promo_label?.trim() || "Акция";
+              const oldPriceNum = Number(item.old_price);
+              const priceNum = Number(item.price);
+              const hasOldPrice = Number.isFinite(oldPriceNum) && Number.isFinite(priceNum) && oldPriceNum > priceNum;
               return (
                 <div key={item.id} style={{
                   display: "flex", flexDirection: "column" as const,
@@ -950,17 +1251,27 @@ window.history.replaceState(null, '', _u.toString());
                         Фото скоро появится
                       </div>
                     )}
-                    {item.prepared_item_id && !PREPARED_CAT_IDS.includes(cat.id) && preparedOnRequest && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setPorCategoryId(cat.id); setPorExpandedCats(new Set([cat.id])); setPorQtys({ [item.id]: 1 }); setPorPhone(phone); setPorResult(null); setShowPreparedForm(true); }}
-                        style={{ position: "absolute", top: 8, left: 8, padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(90,57,35,0.10)", cursor: "pointer", background: "rgba(248,241,232,0.96)", color: "#5a3923", fontSize: 12, fontWeight: 700, lineHeight: 1, boxShadow: "0 2px 8px rgba(0,0,0,0.10)" }}
-                      >Можно готовым</button>
-                    )}
                   </div>
                   <div style={{ padding: "8px 10px 10px", display: "flex", flexDirection: "column" as const, flex: 1 }}>
                     <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3, marginBottom: item.subtitle ? 2 : 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>{item.title ?? item.name}</div>
-                    {item.subtitle && <div style={{ fontSize: 12, opacity: 0.5, marginBottom: 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical" as const }}>{item.subtitle}</div>}
-                    <div style={{ fontSize: 14, fontWeight: 600, opacity: 0.55, marginBottom: 8 }}>{item.price}{currency} / {item.unit}</div>
+                    {item.subtitle && <div style={{ fontSize: 12, opacity: 0.5, marginBottom: mode === "hot" && (item.wait_time || item.portion_note) ? 2 : 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical" as const }}>{item.subtitle}</div>}
+                    {mode === "hot" && (item.wait_time || item.portion_note) && (
+                      <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 4, marginBottom: 6 }}>
+                        {item.portion_note && <span style={{ fontSize: 11, lineHeight: 1.2, padding: "3px 6px", borderRadius: 999, background: "#f4f0ea", color: "#6b5e4e" }}>{item.portion_note.replace(/^порция\s*/i, "")}</span>}
+                        {item.wait_time && <span style={{ fontSize: 11, lineHeight: 1.2, padding: "3px 6px", borderRadius: 999, background: "#f4f0ea", color: "#6b5e4e" }}>{item.wait_time.replace(/\s*минут$/i, " мин")}</span>}
+                      </div>
+                    )}
+                    {(hasPromo || hasOldPrice) ? (
+                      <div style={{ marginBottom: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", marginBottom: 2 }}>
+                          {hasPromo && <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", background: "#c0392b", borderRadius: 4, padding: "1px 5px" }}>{promoLabel}</span>}
+                          {hasOldPrice && <span style={{ fontSize: 12, opacity: 0.45, textDecoration: "line-through" }}>{item.old_price}{currency}</span>}
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: mode === "hot" ? 700 : 600, opacity: mode === "hot" ? 0.7 : 0.55, whiteSpace: "nowrap" }}>{item.price}{currency} / {item.unit}</div>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 14, fontWeight: mode === "hot" ? 700 : 600, opacity: mode === "hot" ? 0.7 : 0.55, marginBottom: 8, whiteSpace: "nowrap" }}>{item.price}{currency} / {item.unit}</div>
+                    )}
                     <div style={{ marginTop: "auto" }}>
                       {inCart ? (
                         <div style={{ ...S.qtyControls, justifyContent: "center" }}>
@@ -971,7 +1282,9 @@ window.history.replaceState(null, '', _u.toString());
                       ) : item.in_stock === false ? (
                         <div style={{ color: "#999", fontSize: 13, textAlign: "center" as const }}>Нет в наличии</div>
                       ) : (
-                        <button style={{ ...S.addBtn, width: "100%", padding: "7px 0", fontSize: 13 }} onClick={() => addToCart({ ...item, category: cat.name })}>+ Добавить</button>
+                        mode === "hot"
+                          ? <button className="rp-add-btn" style={{ ...S.addBtn, width: "100%", padding: "7px 0", fontSize: 13 }} onClick={() => addHotToCart({ ...item, category: dc.label, _orderMode: "hot" })}>+ 3 порции</button>
+                          : <button className="rp-add-btn" style={{ ...S.addBtn, width: "100%", padding: "7px 0", fontSize: 13 }} onClick={() => addToCart({ ...item, category: dc.label, _orderMode: mode })}>+ Добавить</button>
                       )}
                     </div>
                   </div>
@@ -982,61 +1295,144 @@ window.history.replaceState(null, '', _u.toString());
         </div>
       ))}
 
-      {preparedOnRequest && (
-        <div style={{ padding: "8px 16px 12px" }}>
-          <div style={{
-            borderRadius: 16, background: "#faf7f0", border: "1px solid rgba(0,0,0,.08)",
-            padding: "16px",
-          }}>
-            <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.25, marginBottom: 6 }}>
-              {preparedOnRequest.title}
-            </div>
-            <div style={{ fontSize: 13, opacity: 0.75, lineHeight: 1.45, marginBottom: 14 }}>
-              {preparedOnRequest.subtitle}
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => { setPorCategoryId(null); setPorExpandedCats(new Set(preparedCtaCats.map(c => c.id))); setPorQtys({}); setPorPhone(phone); setPorResult(null); setShowPreparedForm(true); }} style={{
-                flex: 1, padding: "11px 0", borderRadius: 12, border: "none",
-                background: tgVar("button-color", "#3390ec"), color: tgVar("button-text-color", "#fff"),
-                fontSize: 14, fontWeight: 600, cursor: "pointer",
-              }}>
-                {preparedOnRequest.cta_text || "Оставить заявку"}
-              </button>
-              {preparedOnRequest.cta_secondary_text && preparedOnRequest.cta_secondary_value && (
-                <a
-                  href={preparedOnRequest.cta_secondary_mode === "phone" ? `tel:${preparedOnRequest.cta_secondary_value}` : preparedOnRequest.cta_secondary_value}
-                  {...(preparedOnRequest.cta_secondary_mode === "link" ? { target: "_blank", rel: "noreferrer" } : {})}
-                  style={{
-                    flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
-                    padding: "11px 0", borderRadius: 12,
-                    background: tgVar("secondary-bg-color", "#ede8e0"), color: tgVar("text-color", "#1a1a1a"),
-                    fontSize: 14, fontWeight: 600, textDecoration: "none",
-                  }}
-                >
-                  {preparedOnRequest.cta_secondary_text}
-                </a>
-              )}
-            </div>
+      {discountItems.length > 0 && (
+        <div id={`section-${mode}-discounts`} style={S.section}>
+          <div style={{ ...S.sectionTitle, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const }}>
+            <span>🏷️ Со скидкой</span>
+          </div>
+          <div className="rp-grid">
+            {discountItems.map((item) => {
+              const inCart = cart[item.id];
+              const hasPromo = Boolean(item.promo_enabled);
+              const promoLabel = item.promo_label?.trim() || "Акция";
+              const oldPriceNum = Number(item.old_price);
+              const priceNum = Number(item.price);
+              const hasOldPrice = Number.isFinite(oldPriceNum) && Number.isFinite(priceNum) && oldPriceNum > priceNum;
+              return (
+                <div key={item.id} style={{
+                  display: "flex", flexDirection: "column" as const,
+                  borderRadius: 14, background: tgVar("secondary-bg-color", "#f7f7f8"),
+                  overflow: "hidden",
+                }}>
+                  <div style={{ position: "relative" }}>
+                    {item.image ? (
+                      <img src={item.image} alt={item.name} style={{
+                        width: "100%", aspectRatio: "3/2", objectFit: "cover", display: "block",
+                        ...(IMAGE_POS[item.id] && { objectPosition: IMAGE_POS[item.id] }),
+                      }} />
+                    ) : (
+                      <div style={{
+                        width: "100%", aspectRatio: "3/2", display: "flex",
+                        alignItems: "center", justifyContent: "center",
+                        background: "#f0ebe3", color: "#b0a898", fontSize: 11,
+                      }}>Фото скоро появится</div>
+                    )}
+                  </div>
+                  <div style={{ padding: "8px 10px 10px", display: "flex", flexDirection: "column" as const, flex: 1 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3, marginBottom: item.subtitle ? 2 : 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>{item.title ?? item.name}</div>
+                    {item.subtitle && <div style={{ fontSize: 12, opacity: 0.5, marginBottom: mode === "hot" && (item.wait_time || item.portion_note) ? 2 : 4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical" as const }}>{item.subtitle}</div>}
+                    {mode === "hot" && (item.wait_time || item.portion_note) && (
+                      <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 4, marginBottom: 6 }}>
+                        {item.portion_note && <span style={{ fontSize: 11, lineHeight: 1.2, padding: "3px 6px", borderRadius: 999, background: "#f4f0ea", color: "#6b5e4e" }}>{item.portion_note.replace(/^порция\s*/i, "")}</span>}
+                        {item.wait_time && <span style={{ fontSize: 11, lineHeight: 1.2, padding: "3px 6px", borderRadius: 999, background: "#f4f0ea", color: "#6b5e4e" }}>{item.wait_time.replace(/\s*минут$/i, " мин")}</span>}
+                      </div>
+                    )}
+                    {(hasPromo || hasOldPrice) ? (
+                      <div style={{ marginBottom: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", marginBottom: 2 }}>
+                          {hasPromo && <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", background: "#c0392b", borderRadius: 4, padding: "1px 5px" }}>{promoLabel}</span>}
+                          {hasOldPrice && <span style={{ fontSize: 12, opacity: 0.45, textDecoration: "line-through" }}>{item.old_price}{currency}</span>}
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: mode === "hot" ? 700 : 600, opacity: mode === "hot" ? 0.7 : 0.55, whiteSpace: "nowrap" }}>{item.price}{currency} / {item.unit}</div>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 14, fontWeight: mode === "hot" ? 700 : 600, opacity: mode === "hot" ? 0.7 : 0.55, marginBottom: 8, whiteSpace: "nowrap" }}>{item.price}{currency} / {item.unit}</div>
+                    )}
+                    <div style={{ marginTop: "auto" }}>
+                      {inCart ? (
+                        <div style={{ ...S.qtyControls, justifyContent: "center" }}>
+                          <button style={{ ...S.qtyBtn, width: 30, height: 30, fontSize: 18 }} onClick={() => changeQty(item.id, -1)}>−</button>
+                          <span style={{ ...S.qtyText, width: 32, fontSize: 15 }}>{inCart.qty}</span>
+                          <button style={{ ...S.qtyBtn, width: 30, height: 30, fontSize: 18 }} onClick={() => changeQty(item.id, 1)}>+</button>
+                        </div>
+                      ) : item.in_stock === false ? (
+                        <div style={{ color: "#999", fontSize: 13, textAlign: "center" as const }}>Нет в наличии</div>
+                      ) : (
+                        mode === "hot"
+                          ? <button className="rp-add-btn" style={{ ...S.addBtn, width: "100%", padding: "7px 0", fontSize: 13 }} onClick={() => addHotToCart({ ...item, category: item.catName, _orderMode: "hot" })}>+ 3 порции</button>
+                          : <button className="rp-add-btn" style={{ ...S.addBtn, width: "100%", padding: "7px 0", fontSize: 13 }} onClick={() => addToCart({ ...item, category: item.catName, _orderMode: mode })}>+ Добавить</button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
-      <div style={{ padding: "16px 16px 24px", textAlign: "center" as const }}>
-        <a href="business.html" style={{
-          fontSize: 12, opacity: 0.35,
-          color: tgVar("text-color", "#1a1a1a"),
-          textDecoration: "none",
-        }}>Для магазинов и партнёров →</a>
-      </div>
-
-      {cartCount > 0 && !showCart && (
-        <div style={S.bottomBar} className="rp-bottom">
-          <button style={S.mainButton(false)} onClick={() => {
-            fetch(`${API_BASE}/api/track/cart_open?tg_user_id=${tgUserId || 0}${testQ}&channel=${channel}&user_key=${encodeURIComponent(userKey)}`, { method: "POST" }).catch(() => {});
-            setShowCart(true);
-          }}>Оформить — {cartTotal}{currency}</button>
-          <button style={S.cartButton} onClick={() => setShowCart(true)}>🛒<span style={S.badge}>{cartCount}</span></button>
+      {!forBusinessEnabled && (
+        <div style={{ padding: "16px 16px 24px", textAlign: "center" as const }}>
+          <a href="business.html" style={{
+            fontSize: 12, opacity: 0.35,
+            color: tgVar("text-color", "#1a1a1a"),
+            textDecoration: "none",
+          }}>Для магазинов и партнёров →</a>
         </div>
+      )}
+
+      {cartTotal > 0 && !showCart && <div style={{ height: 80 }} />}
+
+      {cartTotal > 0 && !showCart && createPortal(
+        <div style={{
+          position: "fixed" as const,
+          left: "50%",
+          bottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
+          transform: "translateX(-50%)",
+          width: isCompactCart ? "calc(100% - 16px)" : "min(calc(100% - 24px), 640px)",
+          zIndex: 220,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: isCompactCart ? 10 : 14,
+          padding: isCompactCart ? "12px 14px" : "14px 16px",
+          borderRadius: 20,
+          background: "rgba(255,255,255,0.98)",
+          border: "1px solid rgba(0,0,0,0.08)",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
+        }}>
+          <div style={{ display: "flex", flexDirection: "column" as const, gap: 5, minWidth: 0, flex: 1 }}>
+            <span style={{ fontSize: isCompactCart ? 16 : 18, fontWeight: 800, color: tgVar("text-color", "#2e221d"), whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" }}>
+              {isCompactCart
+                ? `${cartCount} ${itemsWord(cartCount)} · ${cartTotal}${currency}`
+                : `В корзине: ${cartCount} ${itemsWord(cartCount)} · ${cartTotal}${currency}`}
+            </span>
+            {freeFrom > 0 && (() => {
+              const freeLeft = Math.max(0, freeFrom - cartTotal);
+              return (
+                <>
+                  <span style={{ fontSize: isCompactCart ? 13 : 14, fontWeight: cartTotal >= freeFrom ? 700 : 500, color: cartTotal >= freeFrom ? themeVar("cta") : tgVar("text-color", "#2e221d"), whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {cartTotal >= freeFrom
+                      ? "Бесплатная доставка ✓"
+                      : isCompactCart
+                        ? `До бесплатной доставки: ${freeLeft}${currency}`
+                        : `До бесплатной доставки осталось ${freeLeft}${currency}`}
+                  </span>
+                  <div style={{ height: 5, borderRadius: 999, background: "rgba(0,0,0,0.08)", overflow: "hidden", marginTop: 3 }}>
+                    <div style={{ height: "100%", width: `${freeProgress * 100}%`, background: "linear-gradient(90deg, #60b8ff 0%, #2176d2 100%)", borderRadius: 999 }} />
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+          <button style={{ flexShrink: 0, padding: isCompactCart ? "11px 18px" : "12px 22px", borderRadius: 15, border: "none", cursor: "pointer", fontSize: isCompactCart ? 15 : 16, fontWeight: 800, background: themeVar("cta"), color: "#fff", whiteSpace: "nowrap" as const, boxShadow: "inset 0 -1px 0 rgba(0,0,0,0.12)" }} onClick={() => {
+            fetch(`${API_BASE}/api/track/cart_open?tg_user_id=${tgUserId || 0}${testQ}&channel=${channel}&user_key=${encodeURIComponent(userKey)}`, { method: "POST" }).catch(() => {});
+            window.scrollTo({ top: 0 });
+            setShowCart(true);
+            setTimeout(() => { cartRef.current?.scrollTo({ top: 0 }); }, 0);
+          }}>Корзина</button>
+        </div>,
+        document.body
       )}
 
       {showWhereToBuy && (
@@ -1070,7 +1466,7 @@ window.history.replaceState(null, '', _u.toString());
             <a href={`tel:${bizPhone}`} style={{
               flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
               padding: "12px 0", borderRadius: 12,
-              background: tgVar("button-color", "#3390ec"), color: tgVar("button-text-color", "#ffffff"),
+              background: theme.cta, color: "#ffffff",
               fontSize: 14, fontWeight: 600, textDecoration: "none",
             }}>📞 Позвонить Риму</a>
             <a href="https://max.ru/join/FZnl85uOe410NmUxA0dDMyFYf90-aJkBOweY_tPkUr4" target="_blank" rel="noreferrer" style={{
@@ -1083,197 +1479,198 @@ window.history.replaceState(null, '', _u.toString());
         </div>
       )}
 
-      {showPreparedForm && preparedOnRequest && (
+      {showPromos && catalog && (
+        <>
         <div style={S.overlay}>
-        <div style={S.overlayHeader}>
-            <span style={S.overlayTitle}>Можно заказать в готовом виде</span>
-            <button style={S.closeBtn} onClick={() => { setShowPreparedForm(false); setPorResult(null); setPorCategoryId(null); }}>×</button>
+          <div style={S.overlayHeader}>
+            <span style={S.overlayTitle}>🎁 Специальные предложения</span>
+            <button style={S.closeBtn} onClick={() => setShowPromos(false)}>×</button>
           </div>
-          <div style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 10, background: "#f6efe3", color: "#6b4e2e", fontSize: 13, fontWeight: 600, lineHeight: 1.4 }}>
-            Минимальный заказ — от 3 порций.
-          </div>
-          <div style={{ fontSize: 13, opacity: 0.5, marginBottom: 16, marginTop: -4 }}>Выберите, что приготовить</div>
-          {porResult ? (
-            <div style={{ padding: "20px 0", textAlign: "center" as const }}>
-              <div style={{ fontSize: 22, marginBottom: 12 }}>{porResult.ok ? "✓" : "✗"}</div>
-              <div style={{ fontSize: 15, lineHeight: 1.5, color: porResult.ok ? "#1a6e2e" : "#c0392b" }}>
-                {porResult.text}
-              </div>
-              {porResult.ok && (
-                <button
-                  onClick={() => { setShowPreparedForm(false); setPorResult(null); setPorCategoryId(null); }}
-                  style={{
-                    marginTop: 20, padding: "11px 28px", borderRadius: 12, border: "none",
-                    background: tgVar("secondary-bg-color", "#ede8e0"), color: tgVar("text-color", "#1a1a1a"),
-                    fontSize: 14, fontWeight: 600, cursor: "pointer",
-                  }}
-                >Закрыть</button>
-              )}
-            </div>
-          ) : (
-            <>
-              {(() => {
-                const overlayCats = allCategories.filter(cat => itemsForCat(cat).length > 0);
-                if (overlayCats.length === 0) return null;
-                return (
-                  <div style={{ marginBottom: 16 }}>
-                    {overlayCats.map(cat => {
-                      const catItems = itemsForCat(cat);
-                      const isExpanded = porExpandedCats.has(cat.id);
-                      const showToggle = overlayCats.length > 1;
-                      return (
-                        <div key={cat.id} style={{ marginBottom: showToggle ? 6 : 0 }}>
-                          {showToggle && (
-                            <button
-                              onClick={() => setPorExpandedCats(s => { const n = new Set(s); n.has(cat.id) ? n.delete(cat.id) : n.add(cat.id); return n; })}
-                              style={{ width: "100%", textAlign: "left" as const, padding: "8px 12px", marginBottom: 4, border: "none", cursor: "pointer", background: tgVar("secondary-bg-color", "#e8e2d9"), borderRadius: 10, fontSize: 14, fontWeight: 700, color: tgVar("text-color", "#1a1a1a"), display: "flex", justifyContent: "space-between" as const, alignItems: "center" }}
-                            >
-                              <span>{cat.emoji} {cat.name}</span>
-                              <span style={{ fontSize: 11 }}>{isExpanded ? "▾" : "▸"}</span>
-                            </button>
-                          )}
-                          {(isExpanded || !showToggle) && (() => {
-                            const mostCommon = (vals: (string | undefined)[]) => { const freq: Record<string, number> = {}; for (const v of vals) if (v) freq[v] = (freq[v] ?? 0) + 1; return Object.keys(freq).sort((a, b) => freq[b] - freq[a])[0] ?? null; };
-                            const sharedWaitTime = mostCommon(catItems.map(it => it.prepared_wait_time));
-                            const sharedPriceText = mostCommon(catItems.map(it => it.prepared_price_text));
-                            const priceLabel = (v: string) => v === "уточняется при подтверждении" ? "Цену уточним при подтверждении" : `Цена: ${v}`;
-                            return (
-                              <>
-                                {cat.id === "shashlik" && (
-                                  <div style={{ fontSize: 12, opacity: 0.5, marginBottom: 4, lineHeight: 1.4, paddingLeft: 2 }}>
-                                    Готовим жареный шашлык — не маринованный.
-                                  </div>
-                                )}
-                                {(sharedWaitTime || sharedPriceText) && (
-                                  <div style={{ fontSize: 12, opacity: 0.68, lineHeight: 1.45, marginBottom: 6, paddingLeft: 2 }}>
-                                    {sharedWaitTime && <div>Время приготовления: {sharedWaitTime}</div>}
-                                    {sharedPriceText && <div>{priceLabel(sharedPriceText)}</div>}
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()}
-                          {(isExpanded || !showToggle) && catItems.map(item => {
-                            const mostCommon = (vals: (string | undefined)[]) => { const freq: Record<string, number> = {}; for (const v of vals) if (v) freq[v] = (freq[v] ?? 0) + 1; return Object.keys(freq).sort((a, b) => freq[b] - freq[a])[0] ?? null; };
-                            const sharedWaitTime = mostCommon(catItems.map(it => it.prepared_wait_time));
-                            const sharedPriceText = mostCommon(catItems.map(it => it.prepared_price_text));
-                            const priceLabel = (v: string) => v === "уточняется при подтверждении" ? "Цену уточним при подтверждении" : `Цена: ${v}`;
-                            const qty = porQtys[item.id] ?? 0;
-                            return (
-                              <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 12px", borderRadius: 10, background: tgVar("secondary-bg-color", "#f0ebe3"), marginBottom: 6 }}>
-                                <div>
-                                  <div style={{ fontSize: 14, fontWeight: 600 }}>{item.title ?? item.name}</div>
-                                  {item.subtitle && <div style={{ fontSize: 12, opacity: 0.60, marginTop: 1 }}>{item.subtitle}</div>}
-                                  {item.prepared_wait_time && item.prepared_wait_time !== sharedWaitTime && <div style={{ fontSize: 11, opacity: 0.56, lineHeight: 1.35, marginTop: 2 }}>Время: {item.prepared_wait_time}</div>}
-                                  {item.prepared_price_text && item.prepared_price_text !== sharedPriceText && <div style={{ fontSize: 11, opacity: 0.56, lineHeight: 1.35, marginTop: 1 }}>{priceLabel(item.prepared_price_text)}</div>}
-                                  {item.prepared_note && <div style={{ fontSize: 11, opacity: 0.56, lineHeight: 1.35, marginTop: 1 }}>{item.prepared_note}</div>}
-                                </div>
-                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  <button onClick={() => setPorQtys(q => ({ ...q, [item.id]: Math.max(0, (q[item.id] ?? 0) - 1) }))} style={{ ...S.qtyBtn, width: 28, height: 28, fontSize: 16 }}>−</button>
-                                  <span style={{ ...S.qtyText, width: 28, fontSize: 14, textAlign: "center" as const }}>{qty}</span>
-                                  <button onClick={() => setPorQtys(q => ({ ...q, [item.id]: (q[item.id] ?? 0) + 1 }))} style={{ ...S.qtyBtn, width: 28, height: 28, fontSize: 16 }}>+</button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })}
+          {(() => {
+            const isPromoItem = (item: CatalogItem) => {
+              const p = Number(item.price), op = Number(item.old_price);
+              return item.promo_enabled === true ||
+                (item.old_price != null && Number.isFinite(op) && Number.isFinite(p) && op > p);
+            };
+            const frozenPromos = (catalog.categories ?? []).flatMap(cat =>
+              (cat.items ?? []).filter(isPromoItem).map(item => ({ ...item, _catRef: cat.name }))
+            );
+            const hotPromos = (catalog.hot_categories ?? []).flatMap(cat =>
+              (cat.items ?? []).filter(isPromoItem).map(item => ({ ...item, _catRef: cat.name }))
+            );
+            const manualPromos = promotions;
+            const renderCard = (item: CatalogItem & { _catRef: string }, orderMode: "frozen" | "hot") => {
+              const inCart = cart[item.id];
+              const p = Number(item.price), op = Number(item.old_price);
+              const hasOldPrice = item.old_price != null && Number.isFinite(op) && Number.isFinite(p) && op > p;
+              const hasPromo = Boolean(item.promo_enabled);
+              const promoLabel = item.promo_label?.trim() || "Акция";
+              return (
+                <div key={`${orderMode}-${item.id}`} className="rp-promo-item-card">
+                  {item.image && <img src={item.image} alt="" style={{ width: 74, height: 74, borderRadius: 12, objectFit: "cover" as const, flexShrink: 0 }} />}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.3 }}>{item.title ?? item.name}</div>
+                    {item.subtitle && <div style={{ fontSize: 13, opacity: 0.55, marginTop: 2 }}>{item.subtitle}</div>}
+                    <div style={{ marginTop: 4 }}>
+                      {(hasPromo || hasOldPrice) ? (
+                        <>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" as const, marginBottom: 1 }}>
+                            {hasPromo && <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", background: "#c0392b", borderRadius: 4, padding: "1px 5px" }}>{promoLabel}</span>}
+                            {hasOldPrice && <span style={{ fontSize: 12, opacity: 0.45, textDecoration: "line-through" }}>{item.old_price}{currency}</span>}
+                          </div>
+                          <div style={{ fontSize: 14, fontWeight: 600, opacity: 0.75, whiteSpace: "nowrap" as const }}>{item.price}{currency} / {item.unit}</div>
+                        </>
+                      ) : (
+                        <div style={{ fontSize: 14, fontWeight: 600, opacity: 0.75, whiteSpace: "nowrap" as const }}>{item.price}{currency} / {item.unit}</div>
+                      )}
+                    </div>
                   </div>
-                );
-              })()}
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, opacity: 0.45, textTransform: "uppercase" as const, letterSpacing: "0.5px", marginBottom: 6 }}>Контакт</div>
-                <input
-                  type="text"
-                  placeholder="Имя"
-                  value={porName}
-                  onChange={(e) => setPorName(e.target.value)}
-                  style={{ ...S.input, marginBottom: 8 }}
-                />
-                <input
-                  type="tel"
-                  placeholder="Телефон"
-                  value={porPhone}
-                  onChange={(e) => setPorPhone(e.target.value)}
-                  style={S.input}
-                />
-              </div>
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, opacity: 0.45, textTransform: "uppercase" as const, letterSpacing: "0.5px", marginBottom: 6 }}>Когда нужно</div>
-                <input
-                  type="text"
-                  placeholder="Например: 20 мая, к 18:00"
-                  value={porDesiredTime}
-                  onChange={(e) => setPorDesiredTime(e.target.value)}
-                  style={S.input}
-                />
-              </div>
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, opacity: 0.45, textTransform: "uppercase" as const, letterSpacing: "0.5px", marginBottom: 6 }}>Комментарий</div>
-                <textarea
-                  placeholder="Дополнительные пожелания"
-                  value={porComment}
-                  onChange={(e) => setPorComment(e.target.value)}
-                  rows={3}
-                  style={{ ...S.input, resize: "none" as const, height: "auto" }}
-                />
-              </div>
-              {(() => {
-                const overlayCats2 = allCategories.filter(cat => itemsForCat(cat).length > 0);
-                const porCanSubmit = !!porName.trim() && !!porPhone.trim() &&
-                  (overlayCats2.length === 0 || overlayCats2.some(cat => itemsForCat(cat).some(it => (porQtys[it.id] ?? 0) > 0)));
+                  <div style={{ flexShrink: 0 }}>
+                    {inCart ? (
+                      <div style={{ ...S.qtyControls }}>
+                        <button style={{ ...S.qtyBtn, width: 30, height: 30, fontSize: 18 }} onClick={() => changeQty(item.id, -1)}>−</button>
+                        <span style={{ ...S.qtyText, width: 28, fontSize: 14 }}>{inCart.qty}</span>
+                        <button style={{ ...S.qtyBtn, width: 30, height: 30, fontSize: 18 }} onClick={() => changeQty(item.id, 1)}>+</button>
+                      </div>
+                    ) : item.in_stock === false ? (
+                      <div style={{ fontSize: 12, color: "#999" }}>Нет в наличии</div>
+                    ) : (
+                      <button className="rp-add-btn" style={{ ...S.addBtn, padding: "6px 12px", fontSize: 13 }} onClick={() => orderMode === "hot" ? addHotToCart({ ...item, category: item._catRef, _orderMode: orderMode }) : addToCart({ ...item, category: item._catRef, _orderMode: orderMode })}>{orderMode === "hot" ? "+ 3 порции" : "+ В корзину"}</button>
+                    )}
+                  </div>
+                </div>
+              );
+            };
+            if (!frozenPromos.length && !hotPromos.length && !manualPromos.length) {
+              return <div style={{ fontSize: 14, opacity: 0.5, padding: "20px 0", textAlign: "center" as const }}>Сейчас нет товаров со скидкой</div>;
+            }
+            const hasAutoPromos = frozenPromos.length > 0 || hotPromos.length > 0;
+            return (
+              <>
+                {manualPromos.length > 0 && (
+                  <div style={{ marginBottom: hasAutoPromos ? 20 : 0 }}>
+                    {manualPromos.map(p => (
+                      <div key={p.id} className="rp-promo-banner">
+                        <img src="/promo-labels-banner.png" alt={p.title} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {hasAutoPromos && (
+                  <>
+                    <div className="rp-promo-section-title">Товары со скидкой</div>
+                    {frozenPromos.length > 0 && (
+                      <div style={{ marginBottom: 16 }}>
+                        <div className="rp-promo-mode-header">
+                          <div className="rp-promo-mode-title">❄️ Заморозка</div>
+                        </div>
+                        {frozenPromos.map(item => renderCard(item, "frozen"))}
+                      </div>
+                    )}
+                    {hotPromos.length > 0 && (
+                      <div style={{ marginBottom: 16 }}>
+                        <div className="rp-promo-mode-header">
+                          <div className="rp-promo-mode-title">🔥 Горячее</div>
+                        </div>
+                        {hotPromos.map(item => renderCard(item, "hot"))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            );
+          })()}
+        </div>
+        {cartCount > 0 && window.innerWidth < 900 && createPortal(
+          <div style={{
+            position: "fixed" as const,
+            left: "50%",
+            bottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
+            transform: "translateX(-50%)",
+            width: isCompactCart ? "calc(100% - 16px)" : "min(calc(100% - 24px), 640px)",
+            zIndex: 400,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: isCompactCart ? 10 : 14,
+            padding: isCompactCart ? "12px 14px" : "14px 16px",
+            borderRadius: 20,
+            background: "rgba(255,255,255,0.98)",
+            border: "1px solid rgba(0,0,0,0.08)",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
+          }}>
+            <div style={{ display: "flex", flexDirection: "column" as const, gap: 5, minWidth: 0, flex: 1 }}>
+              <span style={{ fontSize: isCompactCart ? 16 : 18, fontWeight: 800, color: tgVar("text-color", "#2e221d"), whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" }}>
+                {isCompactCart
+                  ? `${cartCount} ${itemsWord(cartCount)} · ${cartTotal}${currency}`
+                  : `В корзине: ${cartCount} ${itemsWord(cartCount)} · ${cartTotal}${currency}`}
+              </span>
+              {freeFrom > 0 && (() => {
+                const freeLeft = Math.max(0, freeFrom - cartTotal);
                 return (
-              <button
-                disabled={!porCanSubmit || porSending}
-                onClick={async () => {
-                  setPorSending(true);
-                  try {
-                    const overlayCats3 = allCategories.filter(cat => itemsForCat(cat).length > 0);
-                    const selectedItems = overlayCats3.flatMap(cat =>
-                      itemsForCat(cat)
-                        .filter(it => (porQtys[it.id] ?? 0) > 0)
-                        .map(it => ({ id: it.id, name: it.title ?? it.name, qty: porQtys[it.id] }))
-                    );
-                    const resp = await fetch(`${API_BASE}/api/prepared-requests`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        name: porName.trim(),
-                        phone: porPhone.trim(),
-                        comment: porComment.trim(),
-                        desired_time: porDesiredTime.trim(),
-                        items: selectedItems,
-                        channel,
-                        user_key: userKey,
-                      }),
-                    });
-                    if (resp.ok) {
-                      setPorResult({ ok: true, text: "Заявка отправлена. Мы свяжемся с вами в ближайшее время." });
-                      setPorName(""); setPorPhone(""); setPorComment(""); setPorDesiredTime(""); setPorQtys({});
-                    } else {
-                      const err = await resp.json().catch(() => ({}));
-                      setPorResult({ ok: false, text: err.detail || "Не удалось отправить заявку. Попробуйте ещё раз." });
-                    }
-                  } catch {
-                    setPorResult({ ok: false, text: "Ошибка соединения. Проверьте интернет и попробуйте снова." });
-                  } finally {
-                    setPorSending(false);
-                  }
-                }}
-                style={S.mainButton(!porCanSubmit || porSending)}
-              >
-                {porSending ? "Отправка..." : (preparedOnRequest.cta_text || "Отправить заявку")}
-              </button>
+                  <>
+                    <span style={{ fontSize: isCompactCart ? 13 : 14, fontWeight: cartTotal >= freeFrom ? 700 : 500, color: cartTotal >= freeFrom ? themeVar("cta") : tgVar("text-color", "#2e221d"), whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {cartTotal >= freeFrom
+                        ? "Бесплатная доставка ✓"
+                        : isCompactCart
+                          ? `До бесплатной доставки: ${freeLeft}${currency}`
+                          : `До бесплатной доставки осталось ${freeLeft}${currency}`}
+                    </span>
+                    <div style={{ height: 5, borderRadius: 999, background: "rgba(0,0,0,0.08)", overflow: "hidden", marginTop: 3 }}>
+                      <div style={{ height: "100%", width: `${freeProgress * 100}%`, background: "linear-gradient(90deg, #60b8ff 0%, #2176d2 100%)", borderRadius: 999 }} />
+                    </div>
+                  </>
                 );
               })()}
-            </>
-          )}
+            </div>
+            <button style={{ flexShrink: 0, padding: isCompactCart ? "11px 18px" : "12px 22px", borderRadius: 15, border: "none", cursor: "pointer", fontSize: isCompactCart ? 15 : 16, fontWeight: 800, background: themeVar("cta"), color: "#fff", whiteSpace: "nowrap" as const, boxShadow: "inset 0 -1px 0 rgba(0,0,0,0.12)" }} onClick={() => {
+              setShowPromos(false);
+              fetch(`${API_BASE}/api/track/cart_open?tg_user_id=${tgUserId || 0}${testQ}&channel=${channel}&user_key=${encodeURIComponent(userKey)}`, { method: "POST" }).catch(() => {});
+              window.scrollTo({ top: 0 });
+              setShowCart(true);
+              setTimeout(() => { cartRef.current?.scrollTo({ top: 0 }); }, 0);
+            }}>Корзина</button>
+          </div>,
+          document.body
+        )}
+        </>
+      )}
+
+      {showAllCategories && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAllCategories(false); }}
+        >
+          <div style={{ background: tgVar("bg-color", "#ffffff"), borderRadius: 16, width: "calc(100% - 32px)", maxWidth: 400, maxHeight: "85vh", overflowY: "auto", padding: "0 16px 24px" }}>
+            <div style={S.overlayHeader}>
+              <span style={S.overlayTitle}>Категории</span>
+              <button style={S.closeBtn} onClick={() => setShowAllCategories(false)}>×</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {visibleDisplayCategories.map(dc => (
+                <button
+                  key={dc.key}
+                  onClick={() => { scrollingRef.current = true; if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current); scrollTimeoutRef.current = setTimeout(() => { scrollingRef.current = false; }, 700); setActiveCatId(dc.key); scrollToSection(`section-${mode}-${dc.key}`); setShowAllCategories(false); }}
+                  style={{
+                    display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center",
+                    minHeight: 56, padding: "10px 8px", borderRadius: 12, border: "none", cursor: "pointer",
+                    fontSize: 13, fontWeight: 500, textAlign: "center" as const, lineHeight: 1.3,
+                    wordBreak: "break-word" as const,
+                    background: tgVar("secondary-bg-color", "#f0ebe3"), color: tgVar("text-color", "#1a1a1a"),
+                  }}
+                >
+                  <span style={{ fontSize: 20, marginBottom: 4 }}>{dc.emoji}</span>
+                  {(mode === "hot" && HOT_LABELS[dc.key]) || dc.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
+
       {showCart && (
-        <div style={S.overlay}>
+        <div ref={cartRef} style={{ ...S.overlay, paddingBottom: 32 }}>
           <div style={S.overlayHeader}>
             <span style={S.overlayTitle}>Ваш заказ</span>
             <button style={S.closeBtn} onClick={() => setShowCart(false)}>×</button>
@@ -1283,30 +1680,134 @@ window.history.replaceState(null, '', _u.toString());
             <div style={S.emptyCart}>Корзина пуста</div>
           ) : (
             <>
-              {cartEntries.map((entry) => (
-                <div key={entry.item.id} style={S.card}>
-                  <div style={S.cardLeft}>
-                    <div style={S.cardName}>{entry.item.name}</div>
-                    <div style={S.cardPrice}>{entry.item.price}{currency} × {entry.qty} = {entry.item.price * entry.qty}{currency}</div>
-                  </div>
-                  <div style={S.qtyControls}>
-                    <button style={S.qtyBtn} onClick={() => changeQty(entry.item.id, -1)}>−</button>
-                    <span style={S.qtyText}>{entry.qty}</span>
-                    <button style={S.qtyBtn} onClick={() => changeQty(entry.item.id, 1)}>+</button>
-                  </div>
-                </div>
-              ))}
+              {(() => {
+                const frozenEntries = cartEntries.filter(e => e.item._orderMode !== "hot");
+                const hotEntries = cartEntries.filter(e => e.item._orderMode === "hot");
 
-              {freeFrom > 0 && cartTotal < freeFrom && (
-                <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 8 }}>
-                  Бесплатная доставка от {freeFrom}{currency}
+                const renderCartEntry = (entry: CartEntry) => {
+                  const isHot = entry.item._orderMode === "hot";
+                  const categoryLabel = entry.item.category || "";
+                  return (
+                    <div key={entry.item.id} style={{ ...S.card, alignItems: "flex-start" }}>
+                      <div style={{ ...S.cardLeft, minWidth: 0 }}>
+                        {categoryLabel && (
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#9a9090", textTransform: "uppercase" as const, letterSpacing: "0.5px", marginBottom: 2 }}>{categoryLabel}</div>
+                        )}
+                        <div style={S.cardName}>{entry.item.title ?? entry.item.name}</div>
+                        <div style={S.cardPrice}>
+                          {entry.item.price}{currency} × {entry.qty}{isHot ? " порции" : ""} = {entry.item.price * entry.qty}{currency}
+                        </div>
+                        {isHot && entry.qty < 3 && (
+                          <div style={{ fontSize: 11, color: "#8a7060", marginTop: 3 }}>Минимум 3 порции — добавьте ещё {3 - entry.qty}</div>
+                        )}
+                      </div>
+                      <div style={{ ...S.qtyControls, flexShrink: 0 }}>
+                        <button style={S.qtyBtn} onClick={() => changeQty(entry.item.id, -1)}>−</button>
+                        <span style={S.qtyText}>{entry.qty}</span>
+                        <button style={S.qtyBtn} onClick={() => changeQty(entry.item.id, 1)}>+</button>
+                      </div>
+                    </div>
+                  );
+                };
+
+                return (
+                  <>
+                    {frozenEntries.length > 0 && (
+                      <>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#2d5fa8", marginBottom: 6 }}>❄️ Заморозка</div>
+                        {frozenEntries.map(renderCartEntry)}
+                      </>
+                    )}
+                    {hotEntries.length > 0 && (
+                      <>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#b94a00", marginBottom: 6, marginTop: frozenEntries.length > 0 ? 10 : 0 }}>🔥 Горячее</div>
+                        {hotEntries.map(renderCartEntry)}
+                      </>
+                    )}
+                  </>
+                );
+              })()}
+
+              {freeFrom > 0 && (
+                <div style={{ marginBottom: 10, fontSize: 13, color: "#5a5550", lineHeight: 1.5 }}>
+                  {cartTotal >= freeFrom
+                    ? <span style={{ fontWeight: 600 }}>🚚 Бесплатная доставка по Саракташу ✓</span>
+                    : <span>🚚 До бесплатной доставки по Саракташу осталось <strong>{Math.max(freeFrom - cartTotal, 0)}{currency}</strong></span>
+                  }
+                  {cartTotal >= freeFrom && !isCompactCart && (
+                    <div style={{ fontSize: 11, color: "#9a8a80", marginTop: 2 }}>Для других населённых пунктов стоимость уточним при подтверждении.</div>
+                  )}
                 </div>
               )}
-              <div style={S.totalLine}><span>Итого</span><span>{cartTotal}{currency}</span></div>
+              <div style={S.totalLine}>
+                <span>Итого</span>
+                <span>
+                  {bonusUse > 0
+                    ? <>{totalAfterBonus}{currency} <span style={{ fontSize: 12, opacity: 0.6 }}>({cartTotal} − {bonusUse} бонусов)</span></>
+                    : <>{cartTotal}{currency}</>
+                  }
+                </span>
+              </div>
 
               <div style={{ marginTop: 20 }}>
                 <label style={S.label}>Телефон для связи</label>
                 <input style={S.input} placeholder="Впишите сюда номер телефона" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" />
+
+                {(() => {
+                  const digits = phone.replace(/\D/g, "");
+                  if (digits.length < 10) return null;
+                  if (bonusLoading) return (
+                    <div style={{ fontSize: 13, opacity: 0.5, margin: "4px 0 10px" }}>Проверяем бонусный счёт...</div>
+                  );
+                  if (!bonusCard) return null;
+                  if (!bonusCard.exists) {
+                    if (cartTotal < BONUS_MIN_ORDER_TOTAL) return (
+                      <div style={{ fontSize: 13, color: themeVar("text_secondary"), margin: "4px 0 10px", lineHeight: 1.45 }}>
+                        🎁 До бонусной карты осталось <strong>{BONUS_MIN_ORDER_TOTAL - cartTotal}{currency}</strong>
+                      </div>
+                    );
+                    return (
+                      <div style={{ fontSize: 13, color: "#5a8a5a", margin: "4px 0 10px", lineHeight: 1.45 }}>
+                        🎁 За этот заказ начислим <strong>{Math.floor(cartTotal * BONUS_EARN_PERCENT / 100)}</strong> бонусов
+                      </div>
+                    );
+                  }
+                  return (
+                    <div style={{ margin: "6px 0 10px", padding: "10px 12px", background: tgVar("secondary-bg-color", "#f5f0eb"), borderRadius: 10, fontSize: 13 }}>
+                      <div style={{ marginBottom: 6 }}>
+                        💳 Бонусный счёт: <strong>{bonusCard.available_balance}</strong> бонусов
+                      </div>
+                      {maxBonus > 0 ? (
+                        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 6 }}>
+                          <input
+                            type="checkbox"
+                            checked={useBonusChecked}
+                            onChange={e => { setUseBonusChecked(e.target.checked); setBonusPin(""); }}
+                          />
+                          Списать {maxBonus} бонусов (−{maxBonus}{currency})
+                        </label>
+                      ) : (
+                        <div style={{ opacity: 0.6 }}>Списание недоступно для этой суммы заказа</div>
+                      )}
+                      {useBonusChecked && (
+                        <>
+                          <input
+                            style={{ ...S.input, marginTop: 6 }}
+                            type="password"
+                            inputMode="numeric"
+                            placeholder={`Введите PIN (${BONUS_PIN_LENGTH} цифр)`}
+                            value={bonusPin}
+                            onChange={e => setBonusPin(e.target.value.replace(/\D/g, "").slice(0, BONUS_PIN_LENGTH))}
+                            maxLength={BONUS_PIN_LENGTH}
+                          />
+                          <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>
+                            Новые бонусы за этот заказ не начисляются
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 <label style={S.label}>Адрес доставки</label>
                 <input style={S.input} placeholder="Впишите сюда адрес доставки" value={address} onChange={(e) => setAddress(e.target.value)} />
@@ -1318,16 +1819,16 @@ window.history.replaceState(null, '', _u.toString());
                 <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
                   <button type="button" onClick={() => { if (isWorkingHours) setDeliveryMode("ASAP"); }} style={{
                     ...S.addBtn, flex: 1,
-                    background: deliveryMode === "ASAP" ? "var(--tg-theme-button-color, #3390ec)" : "var(--tg-theme-secondary-bg-color, #f0f0f0)",
-                    color: deliveryMode === "ASAP" ? "var(--tg-theme-button-text-color, #ffffff)" : "var(--tg-theme-text-color, #1a1a1a)",
+                    background: deliveryMode === "ASAP" ? theme.cta : tgVar("secondary-bg-color", theme.bg_chip),
+                    color: deliveryMode === "ASAP" ? "#ffffff" : tgVar("text-color", theme.text_primary),
                     opacity: isWorkingHours ? 1 : 0.45,
                     cursor: isWorkingHours ? "pointer" : "not-allowed",
                   }}>Как можно скорее</button>
 
                   <button type="button" onClick={() => setDeliveryMode("SCHEDULED")} style={{
                     ...S.addBtn, flex: 1,
-                    background: deliveryMode === "SCHEDULED" ? "var(--tg-theme-button-color, #3390ec)" : "var(--tg-theme-secondary-bg-color, #f0f0f0)",
-                    color: deliveryMode === "SCHEDULED" ? "var(--tg-theme-button-text-color, #ffffff)" : "var(--tg-theme-text-color, #1a1a1a)",
+                    background: deliveryMode === "SCHEDULED" ? theme.cta : tgVar("secondary-bg-color", theme.bg_chip),
+                    color: deliveryMode === "SCHEDULED" ? "#ffffff" : tgVar("text-color", theme.text_primary),
                   }}>Ко времени</button>
                 </div>
 
@@ -1383,33 +1884,34 @@ window.history.replaceState(null, '', _u.toString());
 )}
               </div>
 
-              {result && <div ref={resultRef} style={S.resultBox(result.ok)}>{result.text}</div>}
-
-              <div style={{ ...S.bottomBar, position: "fixed" as const }} className="rp-bottom">
-                <button
-                  style={S.mainButton(
+              <button
+                style={{ ...S.mainButton(
                     sending ||
                     address.trim().length < 4 ||
                     phone.trim().replace(/\D/g, "").length < 10 ||
                     cartEntries.length === 0 ||
                     (!isWorkingHours && deliveryMode === "ASAP") ||
                     (deliveryMode === "SCHEDULED" && !isScheduledTimeValid) ||
-(isWorkingHours && deliveryMode === "SCHEDULED" && deliveryTime && !isScheduledTimeInFuture)
-                  )}
-                  disabled={
+(isWorkingHours && deliveryMode === "SCHEDULED" && deliveryTime && !isScheduledTimeInFuture) ||
+                    (useBonusChecked && bonusPin.length !== BONUS_PIN_LENGTH) ||
+                    hotMinNotMet
+                  ), width: "100%", marginTop: 20, minHeight: 58, whiteSpace: "nowrap" as const, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" as const }}
+                disabled={
                     sending ||
                     address.trim().length < 4 ||
                     phone.trim().replace(/\D/g, "").length < 10 ||
                     cartEntries.length === 0 ||
                     (!isWorkingHours && deliveryMode === "ASAP") ||
                     (deliveryMode === "SCHEDULED" && !isScheduledTimeValid) ||
-(isWorkingHours && deliveryMode === "SCHEDULED" && deliveryTime && !isScheduledTimeInFuture)
+(isWorkingHours && deliveryMode === "SCHEDULED" && deliveryTime && !isScheduledTimeInFuture) ||
+                    (useBonusChecked && bonusPin.length !== BONUS_PIN_LENGTH) ||
+                    hotMinNotMet
                   }
-                  onClick={submitOrder}
-                >
-                  {sending ? "Проверяем..." : `Заказать — ${cartTotal}${currency}`}
-                </button>
-              </div>
+                onClick={submitOrder}
+              >
+                {sending ? "Проверяем..." : `Заказать — ${cartTotal}${currency}`}
+              </button>
+              {result && <div ref={resultRef} style={S.resultBox(result.ok)}>{result.text}</div>}
             </>
           )}
         </div>
