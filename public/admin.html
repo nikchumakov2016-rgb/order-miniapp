@@ -294,6 +294,43 @@
         }
         return '';
       }
+      async function adminIssuePin(orderId, phone) {
+        var tk = sanitizeToken(tok());
+        if (tk.error) { showError(tk.error); return; }
+        var el = document.getElementById('pinresult-' + orderId);
+        if (el) el.innerHTML = '<span style="opacity:.5">Запрашиваем...</span>';
+        var r = await fetch(base() + '/api/admin/bonus-card/pin/issue?phone=' + encodeURIComponent(phone), {
+          method: 'POST',
+          headers: { 'X-Admin-Token': tk.value },
+        }).catch(function() { return null; });
+        if (!r) {
+          if (el) el.innerHTML = '<span style="color:red">Ошибка сети</span>';
+          return;
+        }
+        var data = await r.json().catch(function() { return null; });
+        if (!r.ok) {
+          if (el) el.innerHTML = '<span style="color:red">' + ((data && data.detail) || 'Ошибка') + '</span>';
+          return;
+        }
+        if (data && data.pin_issued && data.pin) {
+          if (el) el.innerHTML =
+            '<b style="font-size:20px;letter-spacing:6px">' + data.pin + '</b>'
+            + '<div style="font-size:11px;opacity:.6;margin-top:2px">Покажите код клиенту. Повторно этот же код не отображается.</div>';
+        } else if (data && !data.pin_issued && data.already_set) {
+          if (el) el.innerHTML = '<span style="opacity:.6">Код карты уже выдан</span>';
+        }
+      }
+      function bonusPinBtn(o) {
+        if (o.status !== 'DONE' || !o.bonus_card_id || o.bonus_used) return '';
+        var safePhone = String(o.phone || '').replace(/'/g, "\\'");
+        return '<div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+          + '<button onclick="adminIssuePin(\'' + o.id + '\',\'' + safePhone + '\')" '
+          + 'style="padding:4px 12px;font-size:12px;background:#3390ec;color:#fff;border:none;border-radius:6px;cursor:pointer">'
+          + 'Выдать код карты'
+          + '</button>'
+          + '<span id="pinresult-' + o.id + '"></span>'
+          + '</div>';
+      }
       const cardTpl = o => `
         <div class="order">
           <div class="order-meta">
@@ -305,6 +342,7 @@
             `• ${i.name} — ${i.qty} ${i.unit || 'шт'} × ${Math.round(i.price_rub)}₽`
           ).join('<br>')}</div>` : ''}
           ${bonusInfo(o)}
+          ${bonusPinBtn(o)}
           <div class="btns">
             ${Object.entries(LABELS).map(([s, l]) =>
               `<button onclick="setStatus('${o.id}','${s}')" style="${s === o.status ? 'outline:2px solid #f0a830;font-weight:700' : 'opacity:.55'}">${l}</button>`
