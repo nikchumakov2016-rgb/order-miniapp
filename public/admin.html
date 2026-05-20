@@ -264,6 +264,36 @@
       const CLOSED_STATUSES = new Set(['DONE', 'REJECTED']);
       const active = orders.filter(o => !CLOSED_STATUSES.has(o.status));
       const closed = orders.filter(o => CLOSED_STATUSES.has(o.status));
+      function bonusInfo(o) {
+        var BONUS_MIN = 1500, BONUS_PCT = 5;
+        var base = o.total_before_bonus != null ? o.total_before_bonus : (o.total_rub || 0);
+        var s = '<div style="font-size:12px;margin-top:6px;padding:6px 10px;background:#f0f4ff;border-radius:6px;line-height:1.6">';
+        var e = '</div>';
+        if (o.bonus_used) {
+          var amount = o.bonus_spent || o.bonus_reserved || 0;
+          var label;
+          if (o.bonus_released_at) {
+            label = '💳 Бонусы возвращены: ' + amount + ' бонусов (заказ отменён)';
+          } else if (o.bonus_spent_at) {
+            label = '💳 Бонусы списаны: ' + amount + ' бонусов';
+          } else {
+            label = '💳 Бонусы зарезервированы: ' + amount + ' бонусов';
+          }
+          return s + label + '<br><span style="opacity:.6">Новые бонусы за этот заказ не начисляются</span>' + e;
+        }
+        if (o.bonus_earned_at) {
+          return s + '🎁 Начислено: ' + o.bonus_earned + ' бонусов' + e;
+        }
+        if (base < BONUS_MIN) return '';
+        if (o.status !== 'DONE') {
+          var willEarn = Math.floor(base * BONUS_PCT / 100);
+          return s + '🎁 При доставке начислим: ' + willEarn + ' бонусов' + e;
+        }
+        if (o.bonus_card_id) {
+          return s + '🎁 Бонусы ожидают начисления' + e;
+        }
+        return '';
+      }
       const cardTpl = o => `
         <div class="order">
           <div class="order-meta">
@@ -274,6 +304,7 @@
           ${(o.items || []).length ? `<div style="font-size:13px;margin-top:4px">Состав:<br>${o.items.map(i =>
             `• ${i.name} — ${i.qty} ${i.unit || 'шт'} × ${Math.round(i.price_rub)}₽`
           ).join('<br>')}</div>` : ''}
+          ${bonusInfo(o)}
           <div class="btns">
             ${Object.entries(LABELS).map(([s, l]) =>
               `<button onclick="setStatus('${o.id}','${s}')" style="${s === o.status ? 'outline:2px solid #f0a830;font-weight:700' : 'opacity:.55'}">${l}</button>`
