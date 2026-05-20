@@ -409,6 +409,11 @@ function App() {
 const [orderStatus, setOrderStatus] = useState<"NEW" | "PENDING_CONFIRMATION" | null>(null);
 const [liveStatus, setLiveStatus] = useState<string | null>(null);
 const [copied, setCopied] = useState<string | null>(null);
+const [pinState, setPinState] = useState<"idle" | "loading" | "shown" | "already_set" | "unavailable">("idle");
+const [pinValue, setPinValue] = useState<string | null>(null);
+const [orderToken, setOrderToken] = useState<string | null>(null);
+const [orderBonusCardId, setOrderBonusCardId] = useState<number | null>(null);
+const [orderBonusUsed, setOrderBonusUsed] = useState<boolean>(false);
 const [mode, setMode] = useState<"frozen" | "hot">("frozen");
 const workStart = catalog?.work_start_hour ?? 10;
 const workEnd = catalog?.work_end_hour ?? 22;
@@ -536,6 +541,9 @@ const isScheduledTimeInFuture =
         .then(data => {
           if (!data?.status) return;
           setLiveStatus(data.status);
+          setOrderToken(data.public_status_token ?? null);
+          setOrderBonusCardId(data.bonus_card_id ?? null);
+          setOrderBonusUsed(Boolean(data.bonus_used));
           if (TERMINAL.has(data.status)) clearInterval(intervalId);
         })
         .catch(err => {
@@ -707,6 +715,30 @@ const isScheduledTimeInFuture =
     }
   }, [maxBonus]);
 
+  async function fetchPin() {
+    if (!orderToken) return;
+    setPinState("loading");
+    try {
+      const r = await fetch(
+        `${API_BASE}/api/bonus-card/pin/issue?public_status_token=${encodeURIComponent(orderToken)}`,
+        { method: "POST" }
+      );
+      if (r.status === 404) { setPinState("unavailable"); return; }
+      const data = await r.json().catch(() => null);
+      if (!r.ok || !data) { setPinState("unavailable"); return; }
+      if (data.pin_issued && data.pin) {
+        setPinValue(data.pin);
+        setPinState("shown");
+      } else if (!data.pin_issued && data.already_set) {
+        setPinState("already_set");
+      } else {
+        setPinState("unavailable");
+      }
+    } catch {
+      setPinState("unavailable");
+    }
+  }
+
   async function submitOrder() {
     if (cartEntries.length === 0 || !address.trim()) return;
     setSending(true);
@@ -829,6 +861,43 @@ window.history.replaceState(null, '', _u.toString());
           Статус: {STATUS_LABELS[liveStatus] ?? liveStatus}
         </div>
       )}
+      {liveStatus === "DONE" && (
+        orderBonusUsed ? (
+          <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 12 }}>
+            Бонусы за этот заказ не начисляются
+          </div>
+        ) : orderBonusCardId !== null ? (
+          <div style={{ marginBottom: 16, padding: "12px 16px", background: "rgba(0,0,0,0.04)", borderRadius: 10, fontSize: 14, maxWidth: 320 }}>
+            <div style={{ marginBottom: 8, fontWeight: 600 }}>
+              💳 Электронная бонусная карта создана
+            </div>
+            {pinState === "idle" && (
+              <button style={{ ...S.mainButton(false), fontSize: 13, padding: "8px 18px", flex: "none" as any }} onClick={fetchPin}>
+                Получить код карты
+              </button>
+            )}
+            {pinState === "loading" && (
+              <div style={{ opacity: 0.5 }}>Запрашиваем...</div>
+            )}
+            {pinState === "shown" && pinValue && (
+              <div>
+                <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 4 }}>Ваш PIN-код (сохраните):</div>
+                <div style={{ fontSize: 32, fontWeight: 700, letterSpacing: 8 }}>{pinValue}</div>
+              </div>
+            )}
+            {pinState === "already_set" && (
+              <div style={{ fontSize: 13, opacity: 0.7 }}>
+                Код уже был выдан ранее. Если потеряли — обратитесь к оператору.
+              </div>
+            )}
+            {pinState === "unavailable" && (
+              <div style={{ fontSize: 13, opacity: 0.7 }}>
+                Не удалось получить код карты. Попробуйте позже или обратитесь к оператору.
+              </div>
+            )}
+          </div>
+        ) : null
+      )}
       {bizPhone && (
         <div style={{ fontSize: 14, opacity: 0.5, marginBottom: 24 }}>
           Вопросы по заказу: {bizPhone}
@@ -870,6 +939,11 @@ window.history.replaceState(null, '', _u.toString());
           setOrderStatus(null);
           setLiveStatus(null);
           setCopied(null);
+          setPinState("idle");
+          setPinValue(null);
+          setOrderToken(null);
+          setOrderBonusCardId(null);
+          setOrderBonusUsed(false);
           if ((window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id) setPrefilled(false);
           else applyLocalContact();
           const _u = new URL(window.location.href);
