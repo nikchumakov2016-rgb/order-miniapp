@@ -1909,7 +1909,7 @@ window.history.replaceState(null, '', _u.toString());
                   }
                 onClick={submitOrder}
               >
-                {sending ? "Проверяем..." : `Заказать — ${cartTotal}${currency}`}
+                {sending ? "Проверяем..." : `Заказать — ${totalAfterBonus}${currency}`}
               </button>
               {result && <div ref={resultRef} style={S.resultBox(result.ok)}>{result.text}</div>}
             </>
