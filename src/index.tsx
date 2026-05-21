@@ -1860,6 +1860,8 @@ window.history.replaceState(null, '', _u.toString());
                           />
                           Списать {maxBonus} бонусов (−{maxBonus}{currency})
                         </label>
+                      ) : bonusCard.available_balance <= 0 ? (
+                        <div style={{ opacity: 0.6 }}>На карте пока нет бонусов для списания</div>
                       ) : (
                         <div style={{ opacity: 0.6 }}>Списание недоступно для этой суммы заказа</div>
                       )}
