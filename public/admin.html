@@ -282,12 +282,15 @@
           return s + label + '<br><span style="opacity:.6">Новые бонусы за этот заказ не начисляются</span>' + e;
         }
         if (o.bonus_earned_at) {
-          return s + '🎁 Начислено: ' + o.bonus_earned + ' бонусов' + e;
+          var earnLabel = o.bonus_card_created
+            ? '🎁 Бонусная карта создана. Начислено: ' + o.bonus_earned + ' бонусов'
+            : '🎁 Начислено: ' + o.bonus_earned + ' бонусов';
+          return s + earnLabel + e;
         }
         if (base < BONUS_MIN) return '';
         if (o.status !== 'DONE' && o.status !== 'REJECTED') {
           var willEarn = Math.floor(base * BONUS_PCT / 100);
-          return s + '🎁 Будет начислено при DONE: ' + willEarn + ' бонусов' + e;
+          return s + '🎁 Будет начислено при выполнении заказа: ' + willEarn + ' бонусов' + e;
         }
         if (o.bonus_card_id) {
           return s + '🎁 Бонусы ожидают начисления' + e;
@@ -321,15 +324,18 @@
         }
       }
       function bonusPinBtn(o) {
-        if (o.status !== 'DONE' || !o.bonus_card_id || o.bonus_used) return '';
-        var safePhone = String(o.phone || '').replace(/'/g, "\\'");
-        return '<div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
-          + '<button onclick="adminIssuePin(\'' + o.id + '\',\'' + safePhone + '\')" '
-          + 'style="padding:4px 12px;font-size:12px;background:#3390ec;color:#fff;border:none;border-radius:6px;cursor:pointer">'
-          + 'Выдать код карты'
-          + '</button>'
-          + '<span id="pinresult-' + o.id + '"></span>'
-          + '</div>';
+        if (o.status !== 'DONE' || !o.bonus_card_id || o.bonus_used || !o.bonus_card_created) return '';
+        if (o.bonus_pin_can_be_issued) {
+          var safePhone = String(o.phone || '').replace(/'/g, "\\'");
+          return '<div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+            + '<button onclick="adminIssuePin(\'' + o.id + '\',\'' + safePhone + '\')" '
+            + 'style="padding:4px 12px;font-size:12px;background:#3390ec;color:#fff;border:none;border-radius:6px;cursor:pointer">'
+            + 'Выдать код карты'
+            + '</button>'
+            + '<span id="pinresult-' + o.id + '"></span>'
+            + '</div>';
+        }
+        return '<div style="font-size:12px;opacity:.6;margin-top:4px">Код карты уже выдан</div>';
       }
       const cardTpl = o => `
         <div class="order">
