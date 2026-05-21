@@ -297,7 +297,7 @@
         }
         return '';
       }
-      async function adminIssuePin(orderId, phone) {
+      window.adminIssuePin = async function adminIssuePin(orderId, phone) {
         var tk = sanitizeToken(tok());
         if (tk.error) { showError(tk.error); return; }
         var el = document.getElementById('pinresult-' + orderId);
