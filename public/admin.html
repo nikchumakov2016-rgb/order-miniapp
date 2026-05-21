@@ -316,6 +316,8 @@
           return;
         }
         if (data && data.pin_issued && data.pin) {
+          window.adminIssuedPins = window.adminIssuedPins || {};
+          window.adminIssuedPins[orderId] = data.pin;
           if (el) el.innerHTML =
             '<b style="font-size:20px;letter-spacing:6px">' + data.pin + '</b>'
             + '<div style="font-size:11px;opacity:.6;margin-top:2px">Покажите код клиенту. Повторно этот же код не отображается.</div>';
@@ -325,6 +327,12 @@
       }
       function bonusPinBtn(o) {
         if (o.status !== 'DONE' || !o.bonus_card_id || o.bonus_used || !o.bonus_card_created) return '';
+        if (window.adminIssuedPins && window.adminIssuedPins[o.id]) {
+          return '<div style="margin-top:6px;padding:6px 10px;background:#e8f5e9;border-radius:6px;font-size:13px">'
+            + '💳 Код карты клиента: <b style="font-size:18px;letter-spacing:5px">' + window.adminIssuedPins[o.id] + '</b>'
+            + '<div style="font-size:11px;opacity:.6;margin-top:2px">После перезагрузки страницы код повторно не показывается.</div>'
+            + '</div>';
+        }
         if (o.bonus_pin_can_be_issued) {
           var safePhone = String(o.phone || '').replace(/'/g, "\\'");
           return '<div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
