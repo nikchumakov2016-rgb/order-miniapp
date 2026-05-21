@@ -1882,7 +1882,7 @@ window.history.replaceState(null, '', _u.toString());
                   return (
                     <div style={{ margin: "6px 0 10px", padding: "10px 12px", background: tgVar("secondary-bg-color", "#f5f0eb"), borderRadius: 10, fontSize: 13 }}>
                       <div style={{ marginBottom: 6 }}>
-                        💳 Бонусный счёт: <strong>{bonusCard.available_balance}</strong> бонусов
+                        💳 Доступно: <strong>{bonusCard.available_balance}</strong> бонусов
                       </div>
                       {maxBonus > 0 ? (
                         <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 6 }}>
@@ -1891,14 +1891,14 @@ window.history.replaceState(null, '', _u.toString());
                             checked={useBonusChecked}
                             onChange={e => { setUseBonusChecked(e.target.checked); setBonusPin(""); }}
                           />
-                          Списать {maxBonus} бонусов (−{maxBonus}{currency})
+                          Списать {maxBonus} бонусов (максимум {BONUS_MAX_REDEEM_PERCENT}% заказа)
                         </label>
                       ) : bonusCard.available_balance <= 0 ? (
-                        <div style={{ opacity: 0.6 }}>На карте пока нет бонусов для списания</div>
+                        <div style={{ opacity: 0.6 }}>На карте пока нет бонусов для списания.</div>
                       ) : (
-                        <div style={{ opacity: 0.6 }}>Списание недоступно для этой суммы заказа</div>
+                        <div style={{ opacity: 0.6 }}>Списание недоступно для этой суммы заказа.</div>
                       )}
-                      {useBonusChecked && (
+                      {useBonusChecked ? (
                         <>
                           <input
                             style={{ ...S.input, marginTop: 6 }}
@@ -1910,10 +1910,14 @@ window.history.replaceState(null, '', _u.toString());
                             maxLength={BONUS_PIN_LENGTH}
                           />
                           <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>
-                            Новые бонусы за этот заказ не начисляются
+                            Новые бонусы за этот заказ не начисляются, потому что используются бонусы
                           </div>
                         </>
-                      )}
+                      ) : cartTotal >= BONUS_MIN_ORDER_TOTAL ? (
+                        <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>
+                          За этот заказ будет начислено: {Math.floor(cartTotal * BONUS_EARN_PERCENT / 100)} бонусов
+                        </div>
+                      ) : null}
                     </div>
                   );
                 })()}
