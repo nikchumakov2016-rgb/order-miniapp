@@ -285,9 +285,9 @@
           return s + '🎁 Начислено: ' + o.bonus_earned + ' бонусов' + e;
         }
         if (base < BONUS_MIN) return '';
-        if (o.status !== 'DONE') {
+        if (o.status !== 'DONE' && o.status !== 'REJECTED') {
           var willEarn = Math.floor(base * BONUS_PCT / 100);
-          return s + '🎁 При доставке начислим: ' + willEarn + ' бонусов' + e;
+          return s + '🎁 Будет начислено при DONE: ' + willEarn + ' бонусов' + e;
         }
         if (o.bonus_card_id) {
           return s + '🎁 Бонусы ожидают начисления' + e;
