@@ -297,6 +297,12 @@
         }
         return '';
       }
+      function issuedPinHtml(pin) {
+        return '<div style="margin-top:6px;padding:6px 10px;background:#e8f5e9;border-radius:6px;font-size:13px">'
+          + '💳 Код карты клиента: <b style="font-size:18px;letter-spacing:5px">' + pin + '</b>'
+          + '<div style="font-size:11px;opacity:.6;margin-top:2px">После перезагрузки страницы код повторно не показывается.</div>'
+          + '</div>';
+      }
       window.adminIssuePin = async function adminIssuePin(orderId, phone) {
         var tk = sanitizeToken(tok());
         if (tk.error) { showError(tk.error); return; }
@@ -318,19 +324,15 @@
         if (data && data.pin_issued && data.pin) {
           window.adminIssuedPins = window.adminIssuedPins || {};
           window.adminIssuedPins[orderId] = data.pin;
-          if (el) el.innerHTML =
-            '<b style="font-size:20px;letter-spacing:6px">' + data.pin + '</b>'
-            + '<div style="font-size:11px;opacity:.6;margin-top:2px">Покажите код клиенту. Повторно этот же код не отображается.</div>';
+          if (el && el.parentElement) el.parentElement.outerHTML = issuedPinHtml(data.pin);
+          else if (el) el.innerHTML = issuedPinHtml(data.pin);
         } else if (data && !data.pin_issued && data.already_set) {
           if (el) el.innerHTML = '<span style="opacity:.6">Код карты уже выдан</span>';
         }
       }
       function bonusPinBtn(o) {
         if (window.adminIssuedPins && window.adminIssuedPins[o.id]) {
-          return '<div style="margin-top:6px;padding:6px 10px;background:#e8f5e9;border-radius:6px;font-size:13px">'
-            + '💳 Код карты клиента: <b style="font-size:18px;letter-spacing:5px">' + window.adminIssuedPins[o.id] + '</b>'
-            + '<div style="font-size:11px;opacity:.6;margin-top:2px">После перезагрузки страницы код повторно не показывается.</div>'
-            + '</div>';
+          return issuedPinHtml(window.adminIssuedPins[o.id]);
         }
         if (o.status !== 'DONE' || !o.bonus_card_id || o.bonus_used || !o.bonus_card_created) return '';
         if (o.bonus_pin_can_be_issued) {
