@@ -428,11 +428,16 @@
         ? '<span style="color:#2e7d32;font-size:12px">✓ PIN установлен</span>'
         : '<span style="opacity:.6;font-size:12px">PIN не установлен</span>';
       var safePhone = String(c.phone || '').replace(/'/g, "\'");
+      var phoneArg = JSON.stringify(String(c.phone || '')).replace(/"/g, '&quot;');
       var resetLabel = c.pin_set ? 'Сбросить PIN' : 'Выдать PIN';
       var resetBtn = '<button onclick="adminResetPin(' + c.id + ',\'' + safePhone + '\')" '
         + 'style="margin-left:8px;padding:3px 10px;font-size:12px;background:#e53935;'
         + 'color:#fff;border:none;border-radius:6px;cursor:pointer">'
         + resetLabel + '</button>';
+      var adjustBtn = '<button onclick="adminAdjustBalance(' + c.id + ',' + phoneArg + ')" '
+        + 'style="margin-left:8px;padding:3px 10px;font-size:12px;background:#1565c0;'
+        + 'color:#fff;border:none;border-radius:6px;cursor:pointer">'
+        + 'Корректировать</button>';
       var resetPinBlock = '';
       if (window.adminResetPins && window.adminResetPins[c.id]) {
         resetPinBlock = issuedPinHtml(window.adminResetPins[c.id]);
@@ -447,7 +452,7 @@
         + 'Потрачено: ' + (c.total_spent || 0)
         + '</div>'
         + resetPinBlock
-        + '<div style="margin-top:6px">' + pinStatus + resetBtn + '</div>'
+        + '<div style="margin-top:6px">' + pinStatus + resetBtn + adjustBtn + '</div>'
         + '</div>';
     }
 
@@ -467,6 +472,34 @@
         window.adminResetPins[cardId] = data.pin;
         loadBonusCards(document.getElementById('bonus-search-phone').value || undefined);
       }
+    };
+
+    window.adminAdjustBalance = async function adminAdjustBalance(cardId, phone) {
+      var deltaStr = prompt('Введите изменение баланса:\nнапример 100 или -100');
+      if (deltaStr === null) return;
+      var raw = deltaStr.trim();
+      if (!/^-?\d+$/.test(raw)) { alert('Введите целое число, например 100 или -100.'); return; }
+      var delta = Number(raw);
+      if (!Number.isSafeInteger(delta) || delta === 0) { alert('Введите ненулевое целое число.'); return; }
+
+      var comment = prompt('Комментарий / причина корректировки');
+      if (comment === null) return;
+      if (!comment.trim()) { alert('Комментарий не может быть пустым.'); return; }
+
+      var sign = delta > 0 ? '+' : '';
+      if (!confirm('Применить корректировку ' + sign + delta + ' бонусов для карты ' + phone + '?')) return;
+
+      var tk = sanitizeToken(tok());
+      if (tk.error) { showError(tk.error); return; }
+      var r = await fetch(base() + '/api/admin/bonus-cards/' + cardId + '/adjust', {
+        method: 'POST',
+        headers: { 'X-Admin-Token': tk.value, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ delta: delta, comment: comment.trim() }),
+      }).catch(function() { return null; });
+      if (!r) { showError('Ошибка сети'); return; }
+      var data = await r.json().catch(function() { return null; });
+      if (!r.ok) { showError((data && data.detail) || 'Ошибка'); return; }
+      loadBonusCards(document.getElementById('bonus-search-phone').value || undefined);
     };
 
     function renderStatsV2(s) {
