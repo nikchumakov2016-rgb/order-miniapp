@@ -538,6 +538,7 @@
     window.adminShowTx = async function adminShowTx(cardId) {
       window.adminOpenTx = window.adminOpenTx || {};
       window.adminTxCache = window.adminTxCache || {};
+      window.adminTxCacheMode = window.adminTxCacheMode || {};
       var el = document.getElementById('tx-' + cardId);
       if (!el) return;
 
@@ -547,6 +548,12 @@
         var btn = el.previousElementSibling && el.previousElementSibling.querySelector('button[onclick^="adminShowTx"]');
         if (btn) btn.textContent = 'История';
         return;
+      }
+
+      var isMobile = window.innerWidth <= 640;
+      var currentMode = isMobile ? 'mobile' : 'desktop';
+      if (window.adminTxCacheMode[cardId] && window.adminTxCacheMode[cardId] !== currentMode) {
+        delete window.adminTxCache[cardId];
       }
 
       window.adminOpenTx[cardId] = true;
@@ -566,6 +573,24 @@
         var txs = await r.json().catch(function() { return []; });
         if (!txs.length) {
           window.adminTxCache[cardId] = '<span style="opacity:.6;font-size:12px">Операций нет</span>';
+        } else if (isMobile) {
+          var cards = txs.map(function(t) {
+            var dt = t.created_at ? t.created_at.slice(0, 16).replace('T', ' ') : '—';
+            var label = TX_TYPE_LABEL[t.type] || escapeHtml(t.type);
+            var sign = (t.type === 'EARNED' || t.type === 'ADMIN_ADD' || t.type === 'RELEASED') ? '+' : '−';
+            var extra = '';
+            if (t.comment) extra += escapeHtml(t.comment);
+            if (t.order_id) extra += (extra ? ' · ' : '') + 'заказ ' + escapeHtml(t.order_id);
+            return '<div style="padding:5px 0;border-bottom:1px solid #eee">'
+              + '<div style="display:flex;justify-content:space-between;align-items:baseline">'
+              + '<span style="opacity:.6;font-size:11px">' + escapeHtml(dt) + '</span>'
+              + '<b style="font-size:12px">' + sign + t.amount + '</b>'
+              + '</div>'
+              + '<div style="font-size:12px">' + label + '</div>'
+              + (extra ? '<div style="font-size:11px;opacity:.7;overflow-wrap:anywhere;word-break:break-word">' + extra + '</div>' : '')
+              + '</div>';
+          }).join('');
+          window.adminTxCache[cardId] = '<div style="max-width:100%;overflow:hidden">' + cards + '</div>';
         } else {
           var rows = txs.map(function(t) {
             var dt = t.created_at ? t.created_at.slice(0, 16).replace('T', ' ') : '—';
@@ -588,6 +613,7 @@
             + '<th style="padding:2px 6px;text-align:left">Комментарий</th>'
             + '</tr></thead><tbody>' + rows + '</tbody></table>';
         }
+        window.adminTxCacheMode[cardId] = currentMode;
       }
       el.innerHTML = window.adminTxCache[cardId];
       el.style.display = '';
