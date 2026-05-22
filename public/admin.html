@@ -267,7 +267,8 @@
         .catch(() => {});
       loadPrepared();
       document.getElementById('bonus-cards-details').style.display = '';
-      if (document.getElementById('bonus-cards-details').open) {
+      if (document.getElementById('bonus-cards-details').open
+          && !document.getElementById('bonus-cards-list').children.length) {
         loadBonusCards(document.getElementById('bonus-search-phone').value || undefined);
       }
       clearInterval(refreshInterval);
