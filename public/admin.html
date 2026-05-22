@@ -40,6 +40,7 @@
     <a href="#editor-details" style="font-size:12px;padding:4px 10px;background:#eee;border-radius:6px;text-decoration:none;color:#333">Редактор</a>
     <a href="#storefront-section" style="font-size:12px;padding:4px 10px;background:#eee;border-radius:6px;text-decoration:none;color:#333">Витрина</a>
     <a href="#stats-details" style="font-size:12px;padding:4px 10px;background:#eee;border-radius:6px;text-decoration:none;color:#333">Статистика</a>
+    <a href="#bonus-cards-details" style="font-size:12px;padding:4px 10px;background:#eee;border-radius:6px;text-decoration:none;color:#333">Бонусные карты</a>
   </div>
   <div id="orders-section" style="display:none;margin-bottom:24px">
     <div style="font-size:15px;font-weight:700;opacity:.75;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Заказы и заявки</div>
@@ -88,6 +89,17 @@
   <details id="stats-details" style="margin:8px 0;display:none">
     <summary style="cursor:pointer;font-size:15px;font-weight:600;padding:8px 0">Статистика</summary>
     <div id="stats-v2"></div>
+  </details>
+  <details id="bonus-cards-details" style="margin:8px 0;display:none">
+    <summary style="cursor:pointer;font-size:15px;font-weight:600;padding:8px 0">Бонусные карты</summary>
+    <div style="margin-top:8px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+        <input id="bonus-search-phone" placeholder="+7..." style="flex:1;min-width:140px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+        <button onclick="loadBonusCards(document.getElementById('bonus-search-phone').value)">Найти</button>
+        <button onclick="document.getElementById('bonus-search-phone').value='';loadBonusCards()" style="background:#eee;color:#333">Все</button>
+      </div>
+      <div id="bonus-cards-list"></div>
+    </div>
   </details>
 
   <script>
@@ -254,6 +266,10 @@
         })
         .catch(() => {});
       loadPrepared();
+      document.getElementById('bonus-cards-details').style.display = '';
+      if (document.getElementById('bonus-cards-details').open) {
+        loadBonusCards(document.getElementById('bonus-search-phone').value || undefined);
+      }
       clearInterval(refreshInterval);
       refreshInterval = setInterval(load, 15000);
     }
@@ -296,12 +312,6 @@
           return s + '🎁 Бонусы ожидают начисления' + e;
         }
         return '';
-      }
-      function issuedPinHtml(pin) {
-        return '<div style="margin-top:6px;padding:6px 10px;background:#e8f5e9;border-radius:6px;font-size:13px">'
-          + '💳 Код карты клиента: <b style="font-size:18px;letter-spacing:5px">' + pin + '</b>'
-          + '<div style="font-size:11px;opacity:.6;margin-top:2px">После перезагрузки страницы код повторно не показывается.</div>'
-          + '</div>';
       }
       window.adminIssuePin = async function adminIssuePin(orderId, phone) {
         var tk = sanitizeToken(tok());
@@ -386,6 +396,78 @@
     }
 
     function fmtDate(iso) { const p = iso.split('-'); return `${p[2]}.${p[1]}.${p[0].slice(2)}`; }
+
+    function issuedPinHtml(pin) {
+      return '<div style="margin-top:6px;padding:6px 10px;background:#e8f5e9;border-radius:6px;font-size:13px">'
+        + '💳 Код карты клиента: <b style="font-size:18px;letter-spacing:5px">' + pin + '</b>'
+        + '<div style="font-size:11px;opacity:.6;margin-top:2px">После перезагрузки страницы код повторно не показывается.</div>'
+        + '</div>';
+    }
+
+    async function loadBonusCards(phone) {
+      var tk = sanitizeToken(tok());
+      if (tk.error) { showError(tk.error); return; }
+      var el = document.getElementById('bonus-cards-list');
+      el.innerHTML = '<span style="opacity:.5">Загрузка...</span>';
+      var params = new URLSearchParams({ limit: '50' });
+      if (phone && phone.trim()) params.set('phone', phone.trim());
+      var r = await fetch(base() + '/api/admin/bonus-cards?' + params.toString(), {
+        headers: { 'X-Admin-Token': tk.value },
+      }).catch(function() { return null; });
+      if (!r || !r.ok) { el.innerHTML = '<span style="color:red">Ошибка загрузки</span>'; return; }
+      var cards = await r.json().catch(function() { return []; });
+      if (!cards.length) { el.innerHTML = '<span style="opacity:.6">Карт не найдено</span>'; return; }
+      el.innerHTML = cards.map(bonusCardRow).join('');
+    }
+
+    function bonusCardRow(c) {
+      var avail = c.available_balance != null
+        ? c.available_balance
+        : Math.max(0, (c.balance || 0) - (c.reserved || 0));
+      var pinStatus = c.pin_set
+        ? '<span style="color:#2e7d32;font-size:12px">✓ PIN установлен</span>'
+        : '<span style="opacity:.6;font-size:12px">PIN не установлен</span>';
+      var safePhone = String(c.phone || '').replace(/'/g, "\'");
+      var resetLabel = c.pin_set ? 'Сбросить PIN' : 'Выдать PIN';
+      var resetBtn = '<button onclick="adminResetPin(' + c.id + ',\'' + safePhone + '\')" '
+        + 'style="margin-left:8px;padding:3px 10px;font-size:12px;background:#e53935;'
+        + 'color:#fff;border:none;border-radius:6px;cursor:pointer">'
+        + resetLabel + '</button>';
+      var resetPinBlock = '';
+      if (window.adminResetPins && window.adminResetPins[c.id]) {
+        resetPinBlock = issuedPinHtml(window.adminResetPins[c.id]);
+      }
+      return '<div class="order" style="font-size:13px">'
+        + '<div><b>' + (c.phone || '—') + '</b>' + (c.name ? ' · ' + c.name : '') + '</div>'
+        + '<div style="margin-top:4px;opacity:.7">'
+        + 'Доступно: <b>' + avail + '</b> · '
+        + 'Баланс: ' + (c.balance || 0) + ' · '
+        + 'Зарезерв.: ' + (c.reserved || 0) + ' · '
+        + 'Начислено: ' + (c.total_earned || 0) + ' · '
+        + 'Потрачено: ' + (c.total_spent || 0)
+        + '</div>'
+        + resetPinBlock
+        + '<div style="margin-top:6px">' + pinStatus + resetBtn + '</div>'
+        + '</div>';
+    }
+
+    window.adminResetPin = async function adminResetPin(cardId, phone) {
+      if (!confirm('Сбросить PIN этой карты и показать новый код?\nСтарый код перестанет работать.')) return;
+      var tk = sanitizeToken(tok());
+      if (tk.error) { showError(tk.error); return; }
+      var params = new URLSearchParams({ phone: phone });
+      var r = await fetch(base() + '/api/admin/bonus-card/pin/reset?' + params.toString(), {
+        method: 'POST', headers: { 'X-Admin-Token': tk.value },
+      }).catch(function() { return null; });
+      if (!r) { showError('Ошибка сети'); return; }
+      var data = await r.json().catch(function() { return null; });
+      if (!r.ok) { showError((data && data.detail) || 'Ошибка'); return; }
+      if (data && data.pin) {
+        window.adminResetPins = window.adminResetPins || {};
+        window.adminResetPins[cardId] = data.pin;
+        loadBonusCards(document.getElementById('bonus-search-phone').value || undefined);
+      }
+    };
 
     function renderStatsV2(s) {
       const stages = [
