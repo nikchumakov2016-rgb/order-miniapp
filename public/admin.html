@@ -397,6 +397,12 @@
 
     function fmtDate(iso) { const p = iso.split('-'); return `${p[2]}.${p[1]}.${p[0].slice(2)}`; }
 
+    function escapeHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
     function issuedPinHtml(pin) {
       return '<div style="margin-top:6px;padding:6px 10px;background:#e8f5e9;border-radius:6px;font-size:13px">'
         + '💳 Код карты клиента: <b style="font-size:18px;letter-spacing:5px">' + pin + '</b>'
@@ -442,6 +448,17 @@
       if (window.adminResetPins && window.adminResetPins[c.id]) {
         resetPinBlock = issuedPinHtml(window.adminResetPins[c.id]);
       }
+      var txOpen = window.adminOpenTx && window.adminOpenTx[c.id];
+      var txCached = window.adminTxCache && window.adminTxCache[c.id];
+      var txBlockInner = (txOpen && txCached) ? txCached : '';
+      var txDisplay = (txOpen && txCached) ? '' : 'none';
+      var txBtnLabel = txOpen ? 'Скрыть историю' : 'История';
+      var txBtn = '<button onclick="adminShowTx(' + c.id + ')" '
+        + 'style="margin-left:8px;padding:3px 10px;font-size:12px;background:#546e7a;'
+        + 'color:#fff;border:none;border-radius:6px;cursor:pointer">'
+        + txBtnLabel + '</button>';
+      var txBlock = '<div id="tx-' + c.id + '" style="margin-top:6px;display:' + txDisplay + '">'
+        + txBlockInner + '</div>';
       return '<div class="order" style="font-size:13px">'
         + '<div><b>' + (c.phone || '—') + '</b>' + (c.name ? ' · ' + c.name : '') + '</div>'
         + '<div style="margin-top:4px;opacity:.7">'
@@ -452,7 +469,8 @@
         + 'Потрачено: ' + (c.total_spent || 0)
         + '</div>'
         + resetPinBlock
-        + '<div style="margin-top:6px">' + pinStatus + resetBtn + adjustBtn + '</div>'
+        + '<div style="margin-top:6px">' + pinStatus + resetBtn + adjustBtn + txBtn + '</div>'
+        + txBlock
         + '</div>';
     }
 
@@ -510,6 +528,71 @@
       var data = await r.json().catch(function() { return null; });
       if (!r.ok) { alert((data && data.detail) || 'Ошибка корректировки бонусов'); return; }
       loadBonusCards(document.getElementById('bonus-search-phone').value || undefined);
+    };
+
+    var TX_TYPE_LABEL = {
+      EARNED: 'Начислено', SPENT: 'Списано', RESERVED: 'Зарезерв.',
+      RELEASED: 'Освобождено', ADMIN_ADD: 'Администратор +', ADMIN_DEDUCT: 'Администратор −',
+    };
+
+    window.adminShowTx = async function adminShowTx(cardId) {
+      window.adminOpenTx = window.adminOpenTx || {};
+      window.adminTxCache = window.adminTxCache || {};
+      var el = document.getElementById('tx-' + cardId);
+      if (!el) return;
+
+      if (window.adminOpenTx[cardId]) {
+        window.adminOpenTx[cardId] = false;
+        el.style.display = 'none';
+        var btn = el.previousElementSibling && el.previousElementSibling.querySelector('button[onclick^="adminShowTx"]');
+        if (btn) btn.textContent = 'История';
+        return;
+      }
+
+      window.adminOpenTx[cardId] = true;
+      if (!window.adminTxCache[cardId]) {
+        el.innerHTML = '<span style="opacity:.5;font-size:12px">Загрузка...</span>';
+        el.style.display = '';
+        var tk = sanitizeToken(tok());
+        if (tk.error) { el.innerHTML = '<span style="color:red;font-size:12px">' + escapeHtml(tk.error) + '</span>'; return; }
+        var r = await fetch(base() + '/api/admin/bonus-cards/' + cardId + '/transactions?limit=20', {
+          headers: { 'X-Admin-Token': tk.value },
+        }).catch(function() { return null; });
+        if (!r || !r.ok) {
+          el.innerHTML = '<span style="color:red;font-size:12px">Ошибка загрузки истории</span>';
+          window.adminOpenTx[cardId] = false;
+          return;
+        }
+        var txs = await r.json().catch(function() { return []; });
+        if (!txs.length) {
+          window.adminTxCache[cardId] = '<span style="opacity:.6;font-size:12px">Операций нет</span>';
+        } else {
+          var rows = txs.map(function(t) {
+            var dt = t.created_at ? t.created_at.slice(0, 16).replace('T', ' ') : '—';
+            var label = TX_TYPE_LABEL[t.type] || escapeHtml(t.type);
+            var sign = (t.type === 'EARNED' || t.type === 'ADMIN_ADD' || t.type === 'RELEASED') ? '+' : '−';
+            var comment = t.comment ? ' · ' + escapeHtml(t.comment) : '';
+            var orderId = t.order_id ? ' · заказ&nbsp;' + escapeHtml(t.order_id) : '';
+            return '<tr>'
+              + '<td style="padding:2px 6px;opacity:.6;white-space:nowrap">' + escapeHtml(dt) + '</td>'
+              + '<td style="padding:2px 6px">' + label + '</td>'
+              + '<td style="padding:2px 6px;font-weight:600">' + sign + t.amount + '</td>'
+              + '<td style="padding:2px 6px;opacity:.7">' + comment + orderId + '</td>'
+              + '</tr>';
+          }).join('');
+          window.adminTxCache[cardId] = '<table style="font-size:12px;border-collapse:collapse;width:100%">'
+            + '<thead><tr style="opacity:.5">'
+            + '<th style="padding:2px 6px;text-align:left">Дата</th>'
+            + '<th style="padding:2px 6px;text-align:left">Тип</th>'
+            + '<th style="padding:2px 6px;text-align:left">Сумма</th>'
+            + '<th style="padding:2px 6px;text-align:left">Комментарий</th>'
+            + '</tr></thead><tbody>' + rows + '</tbody></table>';
+        }
+      }
+      el.innerHTML = window.adminTxCache[cardId];
+      el.style.display = '';
+      var btn = el.previousElementSibling && el.previousElementSibling.querySelector('button[onclick^="adminShowTx"]');
+      if (btn) btn.textContent = 'Скрыть историю';
     };
 
     function renderStatsV2(s) {
