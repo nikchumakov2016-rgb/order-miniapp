@@ -436,13 +436,12 @@
       var safePhone = String(c.phone || '').replace(/'/g, "\'");
       var phoneArg = JSON.stringify(String(c.phone || '')).replace(/"/g, '&quot;');
       var resetLabel = c.pin_set ? 'Сбросить PIN' : 'Выдать PIN';
+      var btnStyle = 'padding:3px 10px;font-size:12px;border:none;border-radius:6px;cursor:pointer;color:#fff';
       var resetBtn = '<button onclick="adminResetPin(' + c.id + ',\'' + safePhone + '\')" '
-        + 'style="margin-left:8px;padding:3px 10px;font-size:12px;background:#e53935;'
-        + 'color:#fff;border:none;border-radius:6px;cursor:pointer">'
+        + 'style="' + btnStyle + ';background:#e53935">'
         + resetLabel + '</button>';
       var adjustBtn = '<button onclick="adminAdjustBalance(' + c.id + ',' + phoneArg + ')" '
-        + 'style="margin-left:8px;padding:3px 10px;font-size:12px;background:#1565c0;'
-        + 'color:#fff;border:none;border-radius:6px;cursor:pointer">'
+        + 'style="' + btnStyle + ';background:#1565c0">'
         + 'Корректировать</button>';
       var resetPinBlock = '';
       if (window.adminResetPins && window.adminResetPins[c.id]) {
@@ -454,8 +453,7 @@
       var txDisplay = (txOpen && txCached) ? '' : 'none';
       var txBtnLabel = txOpen ? 'Скрыть историю' : 'История';
       var txBtn = '<button onclick="adminShowTx(' + c.id + ')" '
-        + 'style="margin-left:8px;padding:3px 10px;font-size:12px;background:#546e7a;'
-        + 'color:#fff;border:none;border-radius:6px;cursor:pointer">'
+        + 'style="' + btnStyle + ';background:#546e7a">'
         + txBtnLabel + '</button>';
       var txBlock = '<div id="tx-' + c.id + '" style="margin-top:6px;display:' + txDisplay + '">'
         + txBlockInner + '</div>';
@@ -469,7 +467,10 @@
         + 'Потрачено: ' + (c.total_spent || 0)
         + '</div>'
         + resetPinBlock
-        + '<div style="margin-top:6px">' + pinStatus + resetBtn + adjustBtn + txBtn + '</div>'
+        + '<div style="margin-top:6px">' + pinStatus + '</div>'
+        + '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px">'
+        + resetBtn + adjustBtn + txBtn
+        + '</div>'
         + txBlock
         + '</div>';
     }
