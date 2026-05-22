@@ -475,16 +475,26 @@
     };
 
     window.adminAdjustBalance = async function adminAdjustBalance(cardId, phone) {
-      var deltaStr = prompt('Введите изменение баланса:\nнапример 100 или -100');
-      if (deltaStr === null) return;
-      var raw = deltaStr.trim();
-      if (!/^-?\d+$/.test(raw)) { alert('Введите целое число, например 100 или -100.'); return; }
-      var delta = Number(raw);
-      if (!Number.isSafeInteger(delta) || delta === 0) { alert('Введите ненулевое целое число.'); return; }
+      var delta;
+      while (true) {
+        var deltaStr = prompt('Введите изменение баланса:\nнапример 100 или -100');
+        if (deltaStr === null) return;
+        var raw = deltaStr.trim();
+        if (!/^-?\d+$/.test(raw)) { alert('Введите целое число, например 100 или -100.'); continue; }
+        var n = Number(raw);
+        if (!Number.isSafeInteger(n) || n === 0) { alert('Введите ненулевое целое число.'); continue; }
+        delta = n;
+        break;
+      }
 
-      var comment = prompt('Комментарий / причина корректировки');
-      if (comment === null) return;
-      if (!comment.trim()) { alert('Комментарий не может быть пустым.'); return; }
+      var comment;
+      while (true) {
+        var c = prompt('Комментарий / причина корректировки');
+        if (c === null) return;
+        if (!c.trim()) { alert('Комментарий не может быть пустым.'); continue; }
+        comment = c;
+        break;
+      }
 
       var sign = delta > 0 ? '+' : '';
       if (!confirm('Применить корректировку ' + sign + delta + ' бонусов для карты ' + phone + '?')) return;
@@ -498,7 +508,7 @@
       }).catch(function() { return null; });
       if (!r) { showError('Ошибка сети'); return; }
       var data = await r.json().catch(function() { return null; });
-      if (!r.ok) { showError((data && data.detail) || 'Ошибка'); return; }
+      if (!r.ok) { alert((data && data.detail) || 'Ошибка корректировки бонусов'); return; }
       loadBonusCards(document.getElementById('bonus-search-phone').value || undefined);
     };
 
