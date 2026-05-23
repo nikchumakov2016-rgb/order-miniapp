@@ -376,9 +376,9 @@
               `<button onclick="setStatus('${o.id}','${s}')" style="${s === o.status ? 'outline:2px solid #f0a830;font-weight:700' : 'opacity:.55'}">${l}</button>`
             ).join('')}
           </div>
-          <div style="margin-top:8px;display:flex;gap:6px;align-items:center">
+          <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
             <input id="note-${o.id}" value="${esc(o.operator_note||'')}" placeholder="Заметка оператора"
-              style="flex:1;padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px">
+              style="flex:1;min-width:120px;padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px">
             <button id="notebtn-${o.id}" onclick="saveNote('${o.id}','note-${o.id}','notebtn-${o.id}')"
               style="padding:4px 10px;font-size:12px;background:#eee;color:#333;border:none;border-radius:6px;cursor:pointer;white-space:nowrap">
               Сохранить заметку
