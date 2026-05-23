@@ -529,7 +529,16 @@
       if (!r) { showError('Ошибка сети'); return; }
       var data = await r.json().catch(function() { return null; });
       if (!r.ok) { alert((data && data.detail) || 'Ошибка корректировки бонусов'); return; }
-      loadBonusCards(document.getElementById('bonus-search-phone').value || undefined);
+      var txWasOpen = window.adminOpenTx && window.adminOpenTx[cardId];
+      if (window.adminTxCache) delete window.adminTxCache[cardId];
+      if (window.adminTxCacheMode) delete window.adminTxCacheMode[cardId];
+      if (txWasOpen) {
+        window.adminOpenTx[cardId] = false;
+        await loadBonusCards(document.getElementById('bonus-search-phone').value || undefined);
+        await window.adminShowTx(cardId);
+      } else {
+        await loadBonusCards(document.getElementById('bonus-search-phone').value || undefined);
+      }
     };
 
     var TX_TYPE_LABEL = {
