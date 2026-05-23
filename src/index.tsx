@@ -277,7 +277,7 @@ function isFutureDeliveryTimeToday(value: string, date = new Date()): boolean {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  NEW:                  "Получен",
+  NEW:                  "Ожидает подтверждения",
   PENDING_CONFIRMATION: "Ожидает подтверждения",
   ACCEPTED:             "Принят",
   COOKING:              "Готовится",
@@ -425,8 +425,6 @@ const theme = { ...DEFAULT_THEME, ...catalog?.theme };
 const currency = catalog?.currency ?? "₽";
 const freeFrom = catalog?.free_delivery_from ?? 0;
 const bizPhone = catalog?.phone ?? "";
-const confirmText = catalog?.order_confirmation_text
-  ?? "Мы получили ваш заказ и скоро перезвоним для подтверждения.";
 
 const isWorkingHours = isWorkingHoursNow(undefined, workStart, workEnd);
 
@@ -937,19 +935,21 @@ window.history.replaceState(null, '', _u.toString());
         </div>
       )}
 
-      <div
-        style={{
-          fontSize: 15,
-          opacity: 0.5,
-          marginBottom: 24,
-          maxWidth: 320,
-          lineHeight: 1.5,
-        }}
-      >
-        {isNightRequest
-          ? "Утром мы проверим наличие и свяжемся с вами для подтверждения."
-          : confirmText}
-      </div>
+      {(isNightRequest || liveStatus === "NEW") && (
+        <div
+          style={{
+            fontSize: 15,
+            opacity: 0.5,
+            marginBottom: 24,
+            maxWidth: 320,
+            lineHeight: 1.5,
+          }}
+        >
+          {isNightRequest
+            ? "Утром мы проверим наличие и свяжемся с вами для подтверждения."
+            : "Заказ отправлен. Мы скоро перезвоним, чтобы уточнить детали."}
+        </div>
+      )}
 
       <div style={{ fontSize: 13, opacity: 0.5, marginBottom: 10 }}>
         Сохраните ссылку, чтобы открыть статус заказа позже
