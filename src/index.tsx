@@ -416,6 +416,7 @@ const [orderBonusUsed, setOrderBonusUsed] = useState<boolean>(false);
 const [orderBonusEarned, setOrderBonusEarned] = useState<number>(0);
 const [orderTotalRub, setOrderTotalRub] = useState<number | null>(null);
 const [orderBonusPinCanBeIssued, setOrderBonusPinCanBeIssued] = useState<boolean>(false);
+const [orderBonusCustomerHasCard, setOrderBonusCustomerHasCard] = useState<boolean>(false);
 const [mode, setMode] = useState<"frozen" | "hot">("frozen");
 const workStart = catalog?.work_start_hour ?? 10;
 const workEnd = catalog?.work_end_hour ?? 22;
@@ -548,6 +549,7 @@ const isScheduledTimeInFuture =
           setOrderBonusEarned(data.bonus_earned ?? 0);
           setOrderTotalRub(data.total_rub ?? null);
           setOrderBonusPinCanBeIssued(Boolean(data.bonus_pin_can_be_issued));
+          setOrderBonusCustomerHasCard(Boolean(data.bonus_customer_has_card));
           if (TERMINAL.has(data.status)) clearInterval(intervalId);
         })
         .catch(err => {
@@ -879,7 +881,7 @@ window.history.replaceState(null, '', _u.toString());
         // B: before DONE — accrual forecast
         if (liveStatus !== "DONE") {
           const base = orderTotalRub ?? 0;
-          if (base < BONUS_MIN_ORDER_TOTAL) return null;
+          if (base < BONUS_MIN_ORDER_TOTAL && !orderBonusCustomerHasCard) return null;
           const willEarn = Math.floor(base * BONUS_EARN_PERCENT / 100);
           return (
             <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 12 }}>
@@ -1913,11 +1915,11 @@ window.history.replaceState(null, '', _u.toString());
                             Новые бонусы за этот заказ не начисляются, потому что используются бонусы
                           </div>
                         </>
-                      ) : cartTotal >= BONUS_MIN_ORDER_TOTAL ? (
+                      ) : (
                         <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>
                           За этот заказ будет начислено: {Math.floor(cartTotal * BONUS_EARN_PERCENT / 100)} бонусов
                         </div>
-                      ) : null}
+                      )}
                     </div>
                   );
                 })()}
