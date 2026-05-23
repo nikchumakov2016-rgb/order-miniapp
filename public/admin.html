@@ -359,7 +359,7 @@
         }
         return '<div style="font-size:12px;opacity:.6;margin-top:4px">Код карты уже выдан</div>';
       }
-      const cardTpl = o => `
+      const cardTpl = o => { var noteDraftKey = JSON.stringify(String(o.id)).replace(/"/g, '&quot;'); return `
         <div class="order">
           <div class="order-meta">
             <b>#${o.id}</b> · <b>${LABELS[o.status] ?? o.status}</b> · ${o.total_rub}₽ · ${o.created_at ?? ''}
@@ -377,15 +377,16 @@
             ).join('')}
           </div>
           <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
-            <input id="note-${o.id}" value="${esc(o.operator_note||'')}" placeholder="Заметка оператора"
-              style="flex:1;min-width:120px;padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px">
+            <input id="note-${o.id}" value="${esc((window.adminNoteDrafts && window.adminNoteDrafts[o.id] != null) ? window.adminNoteDrafts[o.id] : (o.operator_note||''))}" placeholder="Заметка оператора"
+              style="flex:1;min-width:120px;padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px"
+              oninput="(window.adminNoteDrafts = window.adminNoteDrafts || {})[${noteDraftKey}] = this.value">
             <button id="notebtn-${o.id}" onclick="saveNote('${o.id}','note-${o.id}','notebtn-${o.id}')"
               style="padding:4px 10px;font-size:12px;background:#eee;color:#333;border:none;border-radius:6px;cursor:pointer;white-space:nowrap">
               Сохранить заметку
             </button>
           </div>
         </div>
-      `;
+      `; }
       document.getElementById('orders-active').innerHTML = active.map(cardTpl).join('');
       const activeSection = document.getElementById('orders-active-section');
       const activeTitle = document.getElementById('orders-active-title');
@@ -811,6 +812,7 @@
       }).catch(() => null);
       const btn = document.getElementById(btnId);
       if (r && r.ok && btn) {
+        if (window.adminNoteDrafts) delete window.adminNoteDrafts[orderId];
         const orig = btn.textContent;
         btn.textContent = '✓ Сохранено';
         setTimeout(() => { btn.textContent = orig; }, 2000);
