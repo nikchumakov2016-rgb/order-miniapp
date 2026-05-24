@@ -417,6 +417,8 @@ const [orderBonusEarned, setOrderBonusEarned] = useState<number>(0);
 const [orderTotalRub, setOrderTotalRub] = useState<number | null>(null);
 const [orderBonusPinCanBeIssued, setOrderBonusPinCanBeIssued] = useState<boolean>(false);
 const [orderBonusCustomerHasCard, setOrderBonusCustomerHasCard] = useState<boolean>(false);
+const [orderBonusCardCreated, setOrderBonusCardCreated] = useState<boolean>(false);
+const [orderBonusEarnReversedAt, setOrderBonusEarnReversedAt] = useState<string | null>(null);
 const [mode, setMode] = useState<"frozen" | "hot">("frozen");
 const workStart = catalog?.work_start_hour ?? 10;
 const workEnd = catalog?.work_end_hour ?? 22;
@@ -534,7 +536,7 @@ const isScheduledTimeInFuture =
 
   useEffect(() => {
     if (!orderSent) return;
-    const TERMINAL = new Set(["DONE", "REJECTED"]);
+    const TERMINAL = new Set(["REJECTED"]);
     let intervalId: ReturnType<typeof setInterval>;
     const poll = () => {
       fetch(`${API_BASE}/api/orders/${orderSent}`)
@@ -548,6 +550,8 @@ const isScheduledTimeInFuture =
           setOrderTotalRub(data.total_rub ?? null);
           setOrderBonusPinCanBeIssued(Boolean(data.bonus_pin_can_be_issued));
           setOrderBonusCustomerHasCard(Boolean(data.bonus_customer_has_card));
+          setOrderBonusCardCreated(Boolean(data.bonus_card_created));
+          setOrderBonusEarnReversedAt(data.bonus_earn_reversed_at ?? null);
           if (TERMINAL.has(data.status)) clearInterval(intervalId);
         })
         .catch(err => {
@@ -866,7 +870,14 @@ window.history.replaceState(null, '', _u.toString());
         </div>
       )}
       {(() => {
-        if (!liveStatus || liveStatus === "REJECTED") return null;
+        if (!liveStatus) return null;
+        if (liveStatus === "REJECTED") {
+          if (!orderBonusEarnReversedAt) return null;
+          const msg = orderBonusCardCreated
+            ? "Заказ отменён. Начисленные бонусы отменены, бонусная карта, созданная по этому заказу, аннулирована."
+            : "Заказ отменён. Начисленные бонусы за этот заказ отменены.";
+          return <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 12 }}>{msg}</div>;
+        }
         // A: bonus was used (redemption)
         if (orderBonusUsed) {
           const msg = liveStatus === "DONE"
@@ -979,6 +990,8 @@ window.history.replaceState(null, '', _u.toString());
           setOrderBonusEarned(0);
           setOrderTotalRub(null);
           setOrderBonusPinCanBeIssued(false);
+          setOrderBonusCardCreated(false);
+          setOrderBonusEarnReversedAt(null);
           if ((window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id) setPrefilled(false);
           else applyLocalContact();
           const _u = new URL(window.location.href);
