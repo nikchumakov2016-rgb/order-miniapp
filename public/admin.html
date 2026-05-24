@@ -301,6 +301,12 @@
             : '';
           return s + statusLine + breakdown + '<br><span style="opacity:.6">Новые бонусы за этот заказ не начисляются</span>' + e;
         }
+        if (o.bonus_earn_reversed_at) {
+          var reversedLabel = o.bonus_card_created
+            ? '🎁 Начисление отменено. Бонусная карта, созданная этим заказом, аннулирована.'
+            : '🎁 Начисление отменено: ' + (o.bonus_earned || 0) + ' бонусов';
+          return s + reversedLabel + e;
+        }
         if (o.bonus_earned_at) {
           var earnLabel = o.bonus_card_created
             ? '🎁 Бонусная карта создана. Начислено: ' + o.bonus_earned + ' бонусов'
