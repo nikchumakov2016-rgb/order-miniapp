@@ -288,15 +288,18 @@
         var e = '</div>';
         if (o.bonus_used) {
           var amount = o.bonus_spent || o.bonus_reserved || 0;
-          var label;
+          var statusLine;
           if (o.bonus_released_at) {
-            label = '💳 Бонусы возвращены: ' + amount + ' бонусов (заказ отменён)';
+            statusLine = '💳 Бонусы возвращены: ' + amount + ' бонусов (заказ отменён)';
           } else if (o.bonus_spent_at) {
-            label = '💳 Бонусы списаны: ' + amount + ' бонусов';
+            statusLine = '💳 Списано: ' + amount + ' бонусов';
           } else {
-            label = '💳 Бонусы зарезервированы: ' + amount + ' бонусов';
+            statusLine = '💳 Клиент хочет списать: ' + amount + ' бонусов (зарезервировано)';
           }
-          return s + label + '<br><span style="opacity:.6">Новые бонусы за этот заказ не начисляются</span>' + e;
+          var breakdown = (o.total_before_bonus != null && o.total_rub != null && amount > 0)
+            ? '<br><span style="opacity:.7">Сумма до списания: ' + o.total_before_bonus + ' ₽ · Скидка: −' + amount + ' ₽ · К оплате: ' + o.total_rub + ' ₽</span>'
+            : '';
+          return s + statusLine + breakdown + '<br><span style="opacity:.6">Новые бонусы за этот заказ не начисляются</span>' + e;
         }
         if (o.bonus_earned_at) {
           var earnLabel = o.bonus_card_created
@@ -308,7 +311,10 @@
         if (o.status !== 'DONE' && o.status !== 'REJECTED') {
           var willEarn = Math.floor(base * BONUS_PCT / 100);
           if (willEarn <= 0) return '';
-          return s + '🎁 Будет начислено при выполнении заказа: ' + willEarn + ' бонусов' + e;
+          var msg = o.bonus_customer_has_card
+            ? '🎁 Будет начислено при выполнении заказа: ' + willEarn + ' бонусов'
+            : '🎁 При доставке будет создана бонусная карта и начислено: ' + willEarn + ' бонусов';
+          return s + msg + e;
         }
         if (o.bonus_card_id) {
           return s + '🎁 Бонусы ожидают начисления' + e;
@@ -369,6 +375,7 @@
           ${(o.items || []).length ? `<div style="font-size:13px;margin-top:4px">Состав:<br>${o.items.map(i =>
             `• ${i.name} — ${i.qty} ${i.unit || 'шт'} × ${Math.round(i.price_rub)}₽`
           ).join('<br>')}</div>` : ''}
+          <div style="font-size:15px;font-weight:700;margin-top:6px">К оплате: ${o.total_rub} ₽</div>
           ${bonusInfo(o)}
           ${bonusPinBtn(o)}
           <div class="btns">
