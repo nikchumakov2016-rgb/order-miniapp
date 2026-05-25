@@ -559,8 +559,51 @@
     var TX_TYPE_LABEL = {
       EARNED: 'Начислено', SPENT: 'Списано', RESERVED: 'Зарезерв.',
       RELEASED: 'Освобождено', ADMIN_ADD: 'Администратор +', ADMIN_DEDUCT: 'Администратор −',
-      EARN_REVERSED: 'Откат начисления',
+      EARN_REVERSED: 'Откат начисления', SPEND_REVERSED: 'Откат списания',
     };
+
+    function renderCardOrders(orders) {
+      var ORDER_ST = {
+        NEW:'Новый', ACCEPTED:'Принят', COOKING:'Готовится',
+        ONWAY:'В пути', DONE:'Доставлен', REJECTED:'Отклонён'
+      };
+      var header = '<div style="font-size:12px;font-weight:600;opacity:.55;'
+        + 'margin-top:12px;margin-bottom:4px;border-top:1px solid #eee;padding-top:8px">'
+        + 'История заказов этой карты</div>';
+      if (!orders || !orders.length) {
+        return header + '<div style="font-size:12px;opacity:.6">Заказов по этой карте пока нет</div>';
+      }
+      var rows = orders.map(function(o) {
+        var dt = o.created_at ? o.created_at.slice(0, 10) : '—';
+        var st = ORDER_ST[o.status] || escapeHtml(o.status || '');
+        var total = o.total_after_bonus != null ? o.total_after_bonus : (o.total_rub || 0);
+        var bonusParts = [];
+        if (o.bonus_card_created) bonusParts.push('🆕 карта создана');
+        if (o.bonus_earn_reversed_at)  bonusParts.push('↩ начисл. отменено' + (o.bonus_earned ? ' ' + o.bonus_earned : ''));
+        else if (o.bonus_earned_at)    bonusParts.push('＋' + o.bonus_earned + ' начислено');
+        if (o.bonus_spend_reversed_at) bonusParts.push('↩ списание отменено ' + o.bonus_spent);
+        else if (o.bonus_spent_at)     bonusParts.push('−' + o.bonus_spent + ' списано');
+        else if (o.bonus_released_at)  bonusParts.push('○ резерв снят');
+        var bonusLine = bonusParts.length
+          ? '<div style="font-size:11px;opacity:.75;margin-top:1px">' + bonusParts.join(' · ') + '</div>'
+          : '';
+        var items = (o.items || []).slice(0, 3).map(function(i) {
+          return escapeHtml(i.name || '') + '\u202F\xd7\u202F' + i.qty;
+        }).join(', ') + ((o.items || []).length > 3 ? '…' : '');
+        var itemsLine = items
+          ? '<div style="font-size:11px;opacity:.55;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + items + '</div>'
+          : '';
+        return '<div style="padding:5px 0;border-bottom:1px solid #f0f0f0">'
+          + '<div style="display:flex;justify-content:space-between;align-items:baseline">'
+          + '<span style="font-size:12px">' + escapeHtml(o.id) + ' · ' + st + '</span>'
+          + '<span style="font-size:12px;font-weight:600">' + total + '₽</span>'
+          + '</div>'
+          + '<div style="font-size:11px;opacity:.55">' + dt + (o.is_test ? ' · тест' : '') + '</div>'
+          + bonusLine + itemsLine
+          + '</div>';
+      }).join('');
+      return header + rows;
+    }
 
     window.adminShowTx = async function adminShowTx(cardId) {
       window.adminOpenTx = window.adminOpenTx || {};
@@ -598,8 +641,9 @@
           return;
         }
         var txs = await r.json().catch(function() { return []; });
+        var txHtml;
         if (!txs.length) {
-          window.adminTxCache[cardId] = '<span style="opacity:.6;font-size:12px">Операций нет</span>';
+          txHtml = '<span style="opacity:.6;font-size:12px">Операций нет</span>';
         } else if (isMobile) {
           var cards = txs.map(function(t) {
             var dt = t.created_at ? t.created_at.slice(0, 16).replace('T', ' ') : '—';
@@ -617,7 +661,7 @@
               + (extra ? '<div style="font-size:11px;opacity:.7;overflow-wrap:anywhere;word-break:break-word">' + extra + '</div>' : '')
               + '</div>';
           }).join('');
-          window.adminTxCache[cardId] = '<div style="max-width:100%;overflow:hidden">' + cards + '</div>';
+          txHtml = '<div style="max-width:100%;overflow:hidden">' + cards + '</div>';
         } else {
           var rows = txs.map(function(t) {
             var dt = t.created_at ? t.created_at.slice(0, 16).replace('T', ' ') : '—';
@@ -632,7 +676,7 @@
               + '<td style="padding:2px 6px;opacity:.7">' + comment + orderId + '</td>'
               + '</tr>';
           }).join('');
-          window.adminTxCache[cardId] = '<table style="font-size:12px;border-collapse:collapse;width:100%">'
+          txHtml = '<table style="font-size:12px;border-collapse:collapse;width:100%">'
             + '<thead><tr style="opacity:.5">'
             + '<th style="padding:2px 6px;text-align:left">Дата</th>'
             + '<th style="padding:2px 6px;text-align:left">Тип</th>'
@@ -640,6 +684,11 @@
             + '<th style="padding:2px 6px;text-align:left">Комментарий</th>'
             + '</tr></thead><tbody>' + rows + '</tbody></table>';
         }
+        var rO = await fetch(base() + '/api/admin/bonus-cards/' + cardId + '/orders?limit=20', {
+          headers: { 'X-Admin-Token': tk.value },
+        }).catch(function() { return null; });
+        var cardOrders = (rO && rO.ok) ? await rO.json().catch(function() { return []; }) : [];
+        window.adminTxCache[cardId] = txHtml + renderCardOrders(cardOrders);
         window.adminTxCacheMode[cardId] = currentMode;
       }
       el.innerHTML = window.adminTxCache[cardId];
