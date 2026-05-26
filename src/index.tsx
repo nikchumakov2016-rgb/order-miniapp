@@ -892,7 +892,10 @@ window.history.replaceState(null, '', _u.toString());
           const willEarn = Math.floor(base * BONUS_EARN_PERCENT / 100);
           return (
             <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 12 }}>
-              🎁 После доставки будет начислено: <strong>{willEarn}</strong> бонусов.
+              🎁 {orderBonusCustomerHasCard
+                ? <>После доставки будет начислено: <strong>{willEarn}</strong> бонусов.</>
+                : <>После доставки будет создана бонусная карта и начислено: <strong>{willEarn}</strong> бонусов.</>
+              }
             </div>
           );
         }
