@@ -929,6 +929,10 @@ window.history.replaceState(null, '', _u.toString());
               </div>
             )}
           </>
+        ) : (orderBonusCardCreated && orderBonusEarned > 0) ? (
+          <div style={{ fontSize: 13, opacity: 0.7 }}>
+            Код бонусной карты уже выдан. Его можно уточнить у продавца.
+          </div>
         ) : null;
         if (!earnedMsg && !pinBlock) return null;
         return (
