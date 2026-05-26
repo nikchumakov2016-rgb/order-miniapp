@@ -536,7 +536,6 @@ const isScheduledTimeInFuture =
 
   useEffect(() => {
     if (!orderSent) return;
-    const TERMINAL = new Set(["REJECTED"]);
     let intervalId: ReturnType<typeof setInterval>;
     const poll = () => {
       fetch(`${API_BASE}/api/orders/${orderSent}`)
@@ -552,7 +551,6 @@ const isScheduledTimeInFuture =
           setOrderBonusCustomerHasCard(Boolean(data.bonus_customer_has_card));
           setOrderBonusCardCreated(Boolean(data.bonus_card_created));
           setOrderBonusEarnReversedAt(data.bonus_earn_reversed_at ?? null);
-          if (TERMINAL.has(data.status)) clearInterval(intervalId);
         })
         .catch(err => {
           if (err === 404) { setLiveStatus('NOT_FOUND'); clearInterval(intervalId); }
