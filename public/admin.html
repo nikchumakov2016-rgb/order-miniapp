@@ -105,6 +105,7 @@
   <script>
     let refreshInterval = null;
     let lastKnownId = null;
+    let errorTimestamp = 0;
     let audioCtx = null;
     let openCategories = new Set();
     let statsLoadedOnce = false;
@@ -151,7 +152,7 @@
 
     function base() { return document.getElementById('apiBase').value.replace(/\/$/, ''); }
     function tok()  { return document.getElementById('token').value; }
-    function showError(msg) { document.getElementById('error').textContent = msg; }
+    function showError(msg) { document.getElementById('error').textContent = msg; errorTimestamp = Date.now(); }
 
     function sanitizeToken(raw) {
       let s = raw.trim().replace(/[\u00A0\u200B-\u200D\uFEFF]/g, '');
@@ -171,7 +172,11 @@
       if (el.type === 'password') { el.type = 'text'; btn.textContent = 'скрыть'; }
       else { el.type = 'password'; btn.textContent = 'показать'; }
     }
-    function clearError()   { document.getElementById('error').textContent = ''; }
+    function clearError(force) {
+      if (!force && Date.now() - errorTimestamp < 60000) return;
+      document.getElementById('error').textContent = '';
+      errorTimestamp = 0;
+    }
     function setDetailsDirty(id, dirty) { document.getElementById(id)?.classList.toggle('has-dirty', dirty); }
     function showStockError(msg) { document.getElementById('stock-error').textContent = msg; }
     function clearStockError()   { document.getElementById('stock-error').textContent = ''; }
@@ -814,7 +819,7 @@
     }
 
     async function setStatus(id, status) {
-      clearError();
+      clearError(true);
       const { value: token, error: tokenError } = sanitizeToken(tok());
       if (tokenError) { showError(tokenError); return; }
       const r = await fetch(`${base()}/api/orders/${id}/status?status=${status}`, {
