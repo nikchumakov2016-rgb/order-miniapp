@@ -3,166 +3,679 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Для магазинов и партнёров</title>
+  <title>Для магазинов — Римские Пельмени</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
       font-family: -apple-system, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background: #f7f5f2;
-      color: #1a1a1a;
+      background: #fbf2e8;
+      color: #2f2723;
       min-height: 100vh;
     }
-    .page { max-width: 480px; margin: 0 auto; padding: 0 0 60px; }
+
+    /* ── layout ── */
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 24px 80px;
+    }
+    @media (max-width: 600px) {
+      .page { padding: 0 0 60px; }
+    }
+
+    /* ── back bar ── */
     .back-bar {
-      padding: 14px 16px 10px;
-      border-bottom: 1px solid #e8e3dc;
+      padding: 10px 0 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    @media (max-width: 600px) {
+      .back-bar { padding: 14px 16px; }
     }
     .back-btn {
-      font-size: 14px; color: #555; text-decoration: none;
-      display: inline-flex; align-items: center; gap: 4px;
-      background: none; border: none; cursor: pointer; padding: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #7d6f66;
+      text-decoration: none;
+      background: rgba(139,42,31,0.06);
+      border: 1px solid rgba(139,42,31,0.10);
+      border-radius: 999px;
+      padding: 6px 14px 6px 10px;
+      transition: background 0.15s;
     }
-    .back-btn:hover { color: #1a1a1a; }
-    .hero { padding: 28px 16px 20px; }
-    .hero-title {
+    .back-btn:hover { background: rgba(139,42,31,0.11); color: #2f2723; }
+    .back-brand {
       font-family: "Cormorant Garamond", Georgia, serif;
-      font-size: 28px; font-weight: 700;
-      color: #1c110a; line-height: 1.2; margin-bottom: 10px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #8B2A1F;
+      letter-spacing: 0.2px;
     }
-    .hero-subtitle {
-      font-size: 15px; line-height: 1.6; color: #444; opacity: 0.85;
+
+    /* ── hero ── */
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      align-items: center;
+      padding: 20px 0 32px;
     }
-    .section { padding: 16px 16px 4px; }
-    .section-title {
-      font-size: 11px; font-weight: 700; letter-spacing: 0.8px;
-      text-transform: uppercase; color: #888; margin-bottom: 10px;
+    @media (max-width: 860px) {
+      .hero {
+        grid-template-columns: 1fr;
+        gap: 28px;
+        padding: 24px 0 28px;
+      }
     }
-    .list-item {
-      display: flex; align-items: flex-start; gap: 10px;
-      font-size: 14px; line-height: 1.55; color: #1a1a1a;
-      padding: 7px 0; border-bottom: 1px solid #ede8e0;
+    @media (max-width: 600px) {
+      .hero { padding: 0 0 24px; }
     }
-    .list-item:last-child { border-bottom: none; }
-    .list-icon { flex-shrink: 0; width: 20px; color: #888; font-style: normal; }
-    .steps-list { counter-reset: steps; }
-    .step-item {
-      display: flex; align-items: flex-start; gap: 12px;
-      font-size: 14px; line-height: 1.55; color: #1a1a1a;
-      padding: 10px 0; border-bottom: 1px solid #ede8e0;
+
+    .hero-text {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
     }
-    .step-item:last-child { border-bottom: none; }
+    @media (max-width: 860px) {
+      .hero-text { order: 2; padding: 0 16px; }
+    }
+
+    .hero-eyebrow {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: #8B2A1F;
+      opacity: 0.75;
+    }
+
+    .hero-h1 {
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-size: 52px;
+      font-weight: 700;
+      line-height: 1.08;
+      color: #1c110a;
+      letter-spacing: -0.5px;
+    }
+    @media (max-width: 1000px) { .hero-h1 { font-size: 42px; } }
+    @media (max-width: 600px)  { .hero-h1 { font-size: 34px; } }
+
+    .hero-lead {
+      font-size: 16px;
+      line-height: 1.65;
+      color: #4a3e38;
+    }
+    @media (max-width: 600px) { .hero-lead { font-size: 15px; } }
+
+    /* ── hero pills ── */
+    .hero-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .hero-pill {
+      font-size: 13px;
+      font-weight: 600;
+      color: #5a4a42;
+      background: rgba(255,250,244,0.80);
+      border: 1px solid rgba(139,42,31,0.14);
+      border-radius: 999px;
+      padding: 5px 14px;
+    }
+
+    /* ── pdf button ── */
+    .pdf-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(139,42,31,0.07);
+      border: 1px solid rgba(139,42,31,0.18);
+      color: #8B2A1F;
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+      border-radius: 999px;
+      padding: 10px 20px;
+      transition: background 0.15s;
+      align-self: flex-start;
+    }
+    .pdf-btn:hover { background: rgba(139,42,31,0.13); }
+    .pdf-btn-steps {
+      margin-top: 16px;
+      width: fit-content;
+    }
+
+    /* ── hero image ── */
+    .hero-img-wrap {
+      border-radius: 28px;
+      overflow: hidden;
+      background: #e8ddd2;
+      min-height: 460px;
+      max-height: 540px;
+    }
+    @media (max-width: 860px) {
+      .hero-img-wrap {
+        order: 1;
+        min-height: 240px;
+        max-height: 340px;
+        border-radius: 0;
+        width: 100%;
+      }
+    }
+    .hero-img {
+      width: 100%;
+      height: 100%;
+      min-height: 460px;
+      object-fit: cover;
+      object-position: center center;
+      display: block;
+    }
+    @media (max-width: 860px) {
+      .hero-img { min-height: 240px; max-height: 340px; }
+    }
+
+    /* ── divider ── */
+    .divider {
+      height: 1px;
+      background: rgba(139,42,31,0.10);
+      margin: 4px 0 24px;
+    }
+    @media (max-width: 600px) {
+      .divider { margin: 8px 16px 24px; }
+    }
+
+    /* ── assortment card ── */
+    .assortment-card {
+      background: rgba(255,250,244,0.82);
+      border: 1px solid rgba(139,42,31,0.12);
+      border-radius: 22px;
+      padding: 24px 28px;
+      box-shadow: 0 4px 18px rgba(80,45,25,0.05);
+      margin-bottom: 20px;
+    }
+    @media (max-width: 600px) {
+      .assortment-card { margin: 0 16px 16px; border-radius: 18px; padding: 18px; }
+    }
+
+    .assortment-title {
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: #8B2A1F;
+      margin-bottom: 16px;
+      letter-spacing: 0.1px;
+    }
+
+    .assortment-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .assortment-pill {
+      font-size: 14px;
+      font-weight: 600;
+      color: #3a2e28;
+      background: rgba(139,42,31,0.05);
+      border: 1px solid rgba(139,42,31,0.12);
+      border-radius: 999px;
+      padding: 6px 16px;
+    }
+
+    /* ── two cards ── */
+    .cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 28px;
+    }
+    @media (max-width: 700px) {
+      .cards { grid-template-columns: 1fr; margin: 0 16px 24px; }
+    }
+
+    .card {
+      background: rgba(255,250,244,0.82);
+      border: 1px solid rgba(139,42,31,0.12);
+      border-radius: 22px;
+      padding: 24px;
+      box-shadow: 0 4px 18px rgba(80,45,25,0.05);
+    }
+
+    .card-title {
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: #8B2A1F;
+      margin-bottom: 16px;
+      letter-spacing: 0.1px;
+    }
+
+    .card-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .card-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 14px;
+      line-height: 1.55;
+      color: #3a2e28;
+    }
+    .card-list li::before {
+      content: "—";
+      color: #8B2A1F;
+      opacity: 0.55;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .steps-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: 14px;
+      line-height: 1.55;
+      color: #3a2e28;
+    }
     .step-num {
-      flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
-      background: #ede8e0; color: #555;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 12px; font-weight: 700; margin-top: 1px;
+      flex-shrink: 0;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(139,42,31,0.08);
+      color: #8B2A1F;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      margin-top: 1px;
     }
-    .docs-note {
-      margin: 16px 16px 0;
-      padding: 12px 14px;
-      background: #ede8e0; border-radius: 10px;
-      font-size: 13px; line-height: 1.5; color: #555;
+
+    /* ── cta ── */
+    .cta-section {
+      padding: 4px 0 0;
     }
-    .cta-bar {
-      padding: 24px 16px 0;
-      display: flex; gap: 10px;
+    @media (max-width: 600px) {
+      .cta-section { padding: 0 16px; }
     }
+
     .cta-btn {
-      flex: 1; padding: 14px 0; border-radius: 12px; border: none;
-      font-size: 15px; font-weight: 600; cursor: pointer;
-      text-decoration: none; text-align: center;
-      display: flex; align-items: center; justify-content: center;
-      transition: opacity .15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      background: #8B2A1F;
+      color: #fff;
+      text-decoration: none;
+      font-size: 17px;
+      font-weight: 700;
+      padding: 18px 24px;
+      border-radius: 18px;
+      letter-spacing: 0.1px;
+      transition: opacity 0.15s;
     }
     .cta-btn:hover { opacity: 0.88; }
-    .cta-primary { background: #3390ec; color: #fff; }
-    .cta-secondary { background: #ede8e0; color: #1a1a1a; }
-    .unavailable {
-      padding: 60px 24px; text-align: center;
-      font-size: 15px; color: #888;
+    @media (max-width: 600px) {
+      .cta-btn { font-size: 16px; padding: 17px 20px; border-radius: 14px; }
+    }
+
+    /* ── docs card ── */
+    .docs-card {
+      background: rgba(255,250,244,0.82);
+      border: 1px solid rgba(139,42,31,0.12);
+      border-radius: 22px;
+      padding: 24px 28px;
+      box-shadow: 0 4px 18px rgba(80,45,25,0.05);
+      margin-bottom: 28px;
+    }
+    @media (max-width: 600px) {
+      .docs-card { margin: 0 16px 24px; border-radius: 18px; padding: 18px; }
+    }
+
+    .docs-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin: 16px 0 20px;
+    }
+    @media (max-width: 700px) {
+      .docs-grid { grid-template-columns: 1fr; gap: 20px; }
+    }
+
+    .docs-col-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #8B2A1F;
+      opacity: 0.75;
+      margin-bottom: 10px;
+    }
+    .docs-col-heading {
+      font-size: 15px;
+      font-weight: 700;
+      color: #3a2e28;
+      margin-bottom: 8px;
+      line-height: 1.35;
+    }
+    .docs-col-desc {
+      font-size: 13px;
+      line-height: 1.55;
+      color: #7d6f66;
+      margin-bottom: 14px;
+    }
+
+    .docs-requisites {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 14px;
+      line-height: 1.65;
+      color: #3a2e28;
+    }
+
+    .docs-links {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .docs-link-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(139,42,31,0.05);
+      border: 1px solid rgba(139,42,31,0.16);
+      color: #8B2A1F;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      border-radius: 12px;
+      padding: 10px 16px;
+      transition: background 0.15s;
+    }
+    .docs-link-btn:hover { background: rgba(139,42,31,0.11); }
+
+    .docs-note {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      background: rgba(139,42,31,0.04);
+      border: 1px solid rgba(139,42,31,0.10);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    @media (max-width: 600px) {
+      .docs-note { flex-direction: column; gap: 6px; }
+    }
+    .docs-note-text {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #4a3e38;
+    }
+    .docs-note-phone {
+      font-size: 13px;
+      font-weight: 700;
+      color: #3a2e28;
+      white-space: nowrap;
+    }
+
+    .cta-btn-sec {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      background: transparent;
+      color: #8B2A1F;
+      text-decoration: none;
+      font-size: 16px;
+      font-weight: 700;
+      padding: 14px 24px;
+      border-radius: 18px;
+      border: 1.5px solid rgba(139,42,31,0.30);
+      letter-spacing: 0.1px;
+      transition: background 0.15s;
+      margin-top: 10px;
+    }
+    .cta-btn-sec:hover { background: rgba(139,42,31,0.05); }
+    @media (max-width: 600px) {
+      .cta-btn-sec { font-size: 15px; padding: 13px 20px; border-radius: 14px; }
     }
   </style>
 </head>
 <body>
-<div class="page">
-  <div class="back-bar">
-    <button class="back-btn" onclick="history.length > 1 ? history.back() : location.href='/'">← Назад</button>
-  </div>
-  <div id="content">
-    <div style="padding: 40px 16px; text-align: center; color: #aaa; font-size: 14px;">Загрузка...</div>
-  </div>
-</div>
-<script>
-  function esc(s) {
-    return String(s)
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;');
-  }
+  <div class="page">
 
-  function renderCta(text, mode, value, cls) {
-    if (!text || !value) return '';
-    const href = mode === 'phone' ? `tel:${esc(value)}` : esc(value);
-    const target = mode === 'link' ? ' target="_blank" rel="noreferrer"' : '';
-    return `<a href="${href}"${target} class="cta-btn ${cls}">${esc(text)}</a>`;
-  }
+    <!-- back bar -->
+    <div class="back-bar">
+      <a href="/" class="back-btn">← Назад</a>
+      <span class="back-brand">Римские Пельмени</span>
+    </div>
 
-  function render(d) {
-    if (!d.enabled) {
-      document.getElementById('content').innerHTML =
-        '<div class="unavailable">Страница временно недоступна.</div>';
-      return;
-    }
-
-    const summary = (d.product_summary || []).map(x =>
-      `<div class="list-item"><i class="list-icon">—</i><span>${esc(x)}</span></div>`
-    ).join('');
-
-    const benefits = (d.benefits || []).map(x =>
-      `<div class="list-item"><i class="list-icon">✓</i><span>${esc(x)}</span></div>`
-    ).join('');
-
-    const whoFor = (d.who_its_for || []).map(x =>
-      `<div class="list-item"><i class="list-icon">·</i><span>${esc(x)}</span></div>`
-    ).join('');
-
-    const steps = (d.steps || []).map((x, i) =>
-      `<div class="step-item"><span class="step-num">${i+1}</span><span>${esc(x)}</span></div>`
-    ).join('');
-
-    const docsNote = d.docs_note
-      ? `<div class="docs-note">${esc(d.docs_note)}</div>` : '';
-
-    const primaryCta   = renderCta(d.cta_text,           d.cta_mode,           d.cta_value,           'cta-primary');
-    const secondaryCta = renderCta(d.secondary_cta_text, d.secondary_cta_mode, d.secondary_cta_value, 'cta-secondary');
-    const ctaBar = (primaryCta || secondaryCta)
-      ? `<div class="cta-bar">${primaryCta}${secondaryCta}</div>` : '';
-
-    document.title = esc(d.title);
-    document.getElementById('content').innerHTML = `
-      <div class="hero">
-        <div class="hero-title">${esc(d.title)}</div>
-        <div class="hero-subtitle">${esc(d.subtitle)}</div>
+    <!-- hero -->
+    <section class="hero">
+      <div class="hero-text">
+        <div class="hero-eyebrow">Оптовые поставки</div>
+        <h1 class="hero-h1" id="hero-title">Для магазинов</h1>
+        <p class="hero-lead" id="hero-subtitle">
+          Поставляем замороженные полуфабрикаты ручной лепки для продуктовых магазинов и торговых точек в Саракташском, Беляевском, Оренбургском районах и Оренбурге.
+        </p>
+        <p class="hero-lead" id="hero-lead-note">
+          Стабильное качество, понятные условия и гибкий подход к каждому партнёру.
+        </p>
+        <div class="hero-pills">
+          <span class="hero-pill">18 позиций в прайсе</span>
+          <span class="hero-pill">Можно начать с небольшой партии</span>
+          <span class="hero-pill">ООО с 2021 года</span>
+        </div>
       </div>
-      ${summary ? `<div class="section"><div class="section-title">О продукте</div>${summary}</div>` : ''}
-      ${benefits ? `<div class="section"><div class="section-title">Почему выбирают</div>${benefits}</div>` : ''}
-      ${whoFor ? `<div class="section"><div class="section-title">Кому подходит</div>${whoFor}</div>` : ''}
-      ${steps ? `<div class="section"><div class="section-title">Как начать</div><div class="steps-list">${steps}</div></div>` : ''}
-      ${docsNote}
-      ${ctaBar}
-    `;
-  }
+      <div class="hero-img-wrap">
+        <img
+          src="/images/hero%20for%20b2b%20(2)%201.png"
+          alt="Замороженные пельмени Римские Пельмени"
+          class="hero-img"
+          loading="eager"
+        />
+      </div>
+    </section>
 
-  fetch('/api/content/for-business')
-    .then(r => r.ok ? r.json() : null)
-    .then(d => {
-      if (d) render(d);
-      else document.getElementById('content').innerHTML =
-        '<div class="unavailable">Не удалось загрузить страницу.</div>';
-    })
-    .catch(() => {
-      document.getElementById('content').innerHTML =
-        '<div class="unavailable">Не удалось подключиться к серверу.</div>';
-    });
-</script>
+    <div class="divider"></div>
+
+    <!-- assortment -->
+    <div class="assortment-card">
+      <div class="assortment-title">Что в ассортименте</div>
+      <div class="assortment-pills" id="assortment-pills">
+        <span class="assortment-pill">Пельмени</span>
+        <span class="assortment-pill">Вареники</span>
+        <span class="assortment-pill">Манты</span>
+        <span class="assortment-pill">Котлеты</span>
+        <span class="assortment-pill">Тефтели</span>
+        <span class="assortment-pill">Голубцы</span>
+      </div>
+    </div>
+
+    <!-- cards -->
+    <div class="cards">
+      <div class="card">
+        <div class="card-title">Почему удобно работать</div>
+        <ul class="card-list" id="benefits-list">
+          <li>Можно начать с небольшой первой поставки</li>
+          <li>Поможем подобрать ходовые позиции для витрины</li>
+          <li>Подскажем по хранению и срокам реализации</li>
+          <li>Если товар не продался и вышел срок — спокойно заменим</li>
+          <li>Условия обсуждаем под формат вашей точки</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title">Как начать</div>
+        <div class="steps-list" id="steps-list">
+          <div class="step">
+            <span class="step-num">1</span>
+            <span>Посмотрите ассортимент и условия в прайсе.</span>
+          </div>
+          <div class="step">
+            <span class="step-num">2</span>
+            <span>Свяжитесь с нами удобным способом.</span>
+          </div>
+          <div class="step">
+            <span class="step-num">3</span>
+            <span>Согласуем первую поставку и условия работы.</span>
+          </div>
+        </div>
+        <a href="/price-b2b.pdf" class="pdf-btn pdf-btn-steps" download>↓ Скачать прайс PDF</a>
+      </div>
+    </div>
+
+    <!-- docs & requisites -->
+    <div class="docs-card">
+      <div class="card-title">Реквизиты и документы</div>
+      <div class="docs-grid">
+        <div class="docs-col">
+          <div class="docs-requisites">
+            <span>ООО «Римские пельмени»</span>
+            <span>ИНН 5643022970</span>
+            <span>ОГРН 1215600009811</span>
+            <span>КПП 564301001</span>
+            <span>462100, Оренбургская область, Саракташский район, п. Саракташ, ул. Вокзальная, д. 131</span>
+            <span>Действуем с октября 2021 года</span>
+            <span>Зарегистрированы в системе «Меркурий»</span>
+          </div>
+        </div>
+        <div class="docs-col">
+          <div class="docs-col-heading">Проверить в открытых источниках</div>
+          <div class="docs-col-desc">Ссылки ведут на открытый госреестр и справочный сервис, где можно сверить основные сведения об организации.</div>
+          <div class="docs-links">
+            <a href="https://checko.ru/company/rimskie-pelmeni-1215600009811" class="docs-link-btn" target="_blank" rel="noreferrer">↗ Карточка компании на Checko</a>
+            <a href="https://egrul.nalog.ru/index.html" class="docs-link-btn" target="_blank" rel="noreferrer">↗ Выписка из ЕГРЮЛ</a>
+          </div>
+        </div>
+      </div>
+      <div class="docs-note">
+        <span class="docs-note-text" id="docs-note-text">Декларации соответствия, карточку предприятия на бланке и другие документы вышлем по запросу.</span>
+        <span class="docs-note-phone" id="docs-note-phone">Телефон: +7 922 881-04-68</span>
+      </div>
+    </div>
+
+    <!-- cta -->
+    <div class="cta-section">
+      <a href="#" class="cta-btn" id="call-btn">Позвонить</a>
+      <a href="#" class="cta-btn-sec" id="sec-cta-btn" rel="noreferrer"></a>
+    </div>
+
+  </div>
+  <script>
+    (function () {
+      function txt(el, s) {
+        if (el && s && s.trim()) el.textContent = s.trim();
+      }
+      function pills(arr) {
+        if (!Array.isArray(arr) || !arr.length) return;
+        var el = document.getElementById('assortment-pills');
+        if (!el) return;
+        el.innerHTML = '';
+        arr.forEach(function (item) {
+          if (!item || !item.trim()) return;
+          var span = document.createElement('span');
+          span.className = 'assortment-pill';
+          span.textContent = item.trim();
+          el.appendChild(span);
+        });
+      }
+      function list(arr) {
+        if (!Array.isArray(arr) || !arr.length) return;
+        var el = document.getElementById('benefits-list');
+        if (!el) return;
+        el.innerHTML = '';
+        arr.forEach(function (item) {
+          if (!item || !item.trim()) return;
+          var li = document.createElement('li');
+          li.textContent = item.trim();
+          el.appendChild(li);
+        });
+      }
+      function steps(arr) {
+        if (!Array.isArray(arr) || !arr.length) return;
+        var el = document.getElementById('steps-list');
+        if (!el) return;
+        el.innerHTML = '';
+        arr.forEach(function (text, i) {
+          if (!text || !text.trim()) return;
+          var div = document.createElement('div');
+          div.className = 'step';
+          var num = document.createElement('span');
+          num.className = 'step-num';
+          num.textContent = String(i + 1);
+          var lbl = document.createElement('span');
+          lbl.textContent = text.trim();
+          div.appendChild(num);
+          div.appendChild(lbl);
+          el.appendChild(div);
+        });
+      }
+      fetch('/api/content/for-business')
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d) return;
+          txt(document.getElementById('hero-title'),    d.title);
+          txt(document.getElementById('hero-subtitle'), d.subtitle);
+          var leadNoteEl = document.getElementById('hero-lead-note');
+          if (leadNoteEl) {
+            if (d.lead_note && d.lead_note.trim()) {
+              leadNoteEl.textContent = d.lead_note.trim();
+              leadNoteEl.style.display = '';
+            } else {
+              leadNoteEl.style.display = 'none';
+            }
+          }
+          pills(d.product_summary);
+          list(d.benefits);
+          steps(d.steps);
+          txt(document.getElementById('docs-note-text'), d.docs_note);
+          var callBtn = document.getElementById('call-btn');
+          if (callBtn) {
+            var phone = d.cta_value || '';
+            if (phone) {
+              callBtn.href = 'tel:' + phone;
+              var notePhone = document.getElementById('docs-note-phone');
+              if (notePhone) notePhone.textContent = 'Телефон: ' + phone;
+            }
+            txt(callBtn, d.cta_text);
+          }
+          var secBtn = document.getElementById('sec-cta-btn');
+          if (secBtn && d.secondary_cta_text && d.secondary_cta_text.trim()) {
+            var secVal = d.secondary_cta_value || '';
+            if (secVal) {
+              if (d.secondary_cta_mode === 'phone') {
+                secBtn.href = 'tel:' + secVal;
+              } else if (/^https?:\/\//.test(secVal)) {
+                secBtn.href = secVal;
+                secBtn.target = '_blank';
+              }
+            }
+            secBtn.textContent = d.secondary_cta_text.trim();
+            secBtn.style.display = 'flex';
+          }
+        })
+        .catch(function () {});
+    }());
+  </script>
 </body>
 </html>

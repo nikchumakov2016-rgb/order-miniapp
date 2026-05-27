@@ -1,5 +1,75 @@
-body {
-  background: var(--tg-theme-secondary-bg-color, white);
+html, body, #root {
+  background: #f6eee4;
   padding: 0;
   margin: 0;
+}
+
+#root {
+  min-height: 100vh;
+  background-color: #f6eee4;
+  background-image:
+    radial-gradient(ellipse 48% 65% at 0%   35%, rgba(139,42,31,0.07) 0%, transparent 100%),
+    radial-gradient(ellipse 48% 65% at 100% 35%, rgba(139,42,31,0.07) 0%, transparent 100%),
+    url('/images/rimskie-food-bg-vintage.png');
+  background-size:
+    auto,
+    auto,
+    cover;
+  background-position:
+    left center,
+    right center,
+    center top;
+  background-repeat: no-repeat;
+  background-attachment:
+    fixed,
+    fixed,
+    fixed;
+}
+
+/* ── центральный контейнер: тёплый пергаментный стекло-слой ── */
+.rp-app {
+  background: rgba(255, 250, 244, 0.90) !important;
+  box-shadow: 0 0 60px rgba(80, 45, 25, 0.10);
+  border-left: 1px solid rgba(120, 75, 45, 0.08);
+  border-right: 1px solid rgba(120, 75, 45, 0.08);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+/* ── шапка: тёплая, не холодно-белая ── */
+.rp-hdr-wrap {
+  background: rgba(255, 250, 244, 0.88) !important;
+  border-bottom: 1px solid rgba(110, 75, 50, 0.10) !important;
+}
+
+/* ── зона табов/категорий: слегка теплее шапки ── */
+.rp-mode-cats {
+  background: rgba(252, 246, 238, 0.86) !important;
+  border-bottom: 1px solid rgba(110, 75, 50, 0.10) !important;
+}
+
+/* ── mobile: плотнее, backdrop-filter убираем (производительность) ── */
+@media (max-width: 899px) {
+  #root {
+    background-attachment: scroll;
+    background-size: cover;
+    background-position: center top;
+  }
+
+  .rp-app {
+    background: rgba(255, 250, 244, 0.96) !important;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+    border-left: none;
+    border-right: none;
+  }
+
+  .rp-hdr-wrap {
+    background: rgba(255, 250, 244, 0.97) !important;
+  }
+
+  .rp-mode-cats {
+    background: rgba(252, 246, 238, 0.97) !important;
+  }
 }
