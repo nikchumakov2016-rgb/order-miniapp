@@ -905,7 +905,7 @@ window.history.replaceState(null, '', _u.toString());
             🎁 За этот заказ начислено: <strong>{orderBonusEarned}</strong> бонусов.
           </div>
         ) : null;
-        const pinBlock = orderBonusPinCanBeIssued ? (
+        const pinBlock = (orderBonusPinCanBeIssued || pinState === "shown") ? (
           <>
             {pinState === "idle" && (
               <button style={{ ...S.mainButton(false), fontSize: 13, padding: "8px 18px", flex: "none" as any }} onClick={fetchPin}>
