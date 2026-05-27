@@ -343,7 +343,7 @@ function App() {
   const BONUS_EARN_PERCENT = 5;
   const BONUS_MAX_REDEEM_PERCENT = 50;
   const BONUS_PIN_LENGTH = 5;
-  const [isTest] = useState(() => {
+  const [isTest, setIsTest] = useState(() => {
     const p = new URLSearchParams(window.location.search);
     if (p.get('test') === '1') {
       sessionStorage.setItem('is_test', '1');
@@ -1133,7 +1133,10 @@ window.history.replaceState(null, '', _u.toString());
         @media (max-width: 899px) { #section-popular { padding-top: 10px !important; } }
         @media (max-width: 899px) { #section-popular .rp-pop-title { border-bottom: none; padding-bottom: 0; margin-bottom: 10px; } }
       `}</style>
-      {isTest && <div style={{position:'fixed',top:0,left:0,right:0,zIndex:9999,background:'#ff3b30',color:'#fff',fontSize:11,fontWeight:700,textAlign:'center' as const,padding:'3px 0',letterSpacing:'1px'}}>ТЕСТОВЫЙ РЕЖИМ</div>}
+      {isTest && <div style={{position:'fixed',top:0,left:0,right:0,zIndex:9999,background:'#ff3b30',color:'#fff',fontSize:11,fontWeight:700,textAlign:'center' as const,padding:'3px 0',letterSpacing:'1px',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+        ТЕСТОВЫЙ РЕЖИМ
+        <button onClick={() => { sessionStorage.removeItem('is_test'); setIsTest(false); }} style={{background:'none',border:'1px solid rgba(255,255,255,0.5)',color:'#fff',borderRadius:4,padding:'1px 7px',cursor:'pointer',fontSize:10,fontWeight:400,letterSpacing:0}}>Выйти</button>
+      </div>}
       {freeFrom > 0 && (
         <div style={{
           background: theme.accent_announcement, color: "#f5e9d6",
