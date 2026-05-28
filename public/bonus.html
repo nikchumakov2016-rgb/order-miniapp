@@ -518,6 +518,15 @@
         return m[3] + '.' + m[2] + '.' + m[1] + ' ' + m[4] + ':' + m[5];
       }
 
+      function bonusWord(n) {
+        var abs = Math.abs(n) % 100;
+        var m   = abs % 10;
+        if (abs >= 11 && abs <= 19) return 'бонусов';
+        if (m === 1)                return 'бонус';
+        if (m >= 2 && m <= 4)       return 'бонуса';
+        return 'бонусов';
+      }
+
       function showError(msg) {
         var el = document.getElementById('error-block');
         el.textContent = msg;
@@ -575,10 +584,19 @@
             var statusCls  = o.status === 'DONE' ? 'done' : o.status === 'REJECTED' ? 'rejected' : '';
             var meta = [];
             meta.push(fmtDate(o.created_at));
-            if (o.bonus_earned > 0) meta.push('начислено ' + o.bonus_earned + ' бонусов');
-            if (o.bonus_spent  > 0) meta.push('списано '   + o.bonus_spent  + ' бонусов');
+            if (o.bonus_earned > 0) {
+              if (o.bonus_earn_reversed_at)
+                meta.push('начисление ' + o.bonus_earned + ' ' + bonusWord(o.bonus_earned) + ' отменено');
+              else
+                meta.push('начислено ' + o.bonus_earned + ' ' + bonusWord(o.bonus_earned));
+            }
+            if (o.bonus_spent > 0) {
+              if (o.bonus_spend_reversed_at)
+                meta.push('списание ' + o.bonus_spent + ' ' + bonusWord(o.bonus_spent) + ' отменено');
+              else
+                meta.push('списано ' + o.bonus_spent + ' ' + bonusWord(o.bonus_spent));
+            }
             if (o.bonus_card_created) meta.push('карта создана');
-            if (o.bonus_earn_reversed_at) meta.push('начисление отменено');
             // items list
             var itemsHtml = '';
             if (o.items && o.items.length) {
