@@ -1071,6 +1071,11 @@ window.history.replaceState(null, '', _u.toString());
         .rp-mode-btn.rp-mode-active { background: var(--theme-primary, #8B2A1F); color: #fff; border-color: var(--theme-primary, #8B2A1F); z-index: 1; position: relative; }
         /* ── desktop: header row alignment ── */
         @media (min-width: 900px) { .rp-hdr { align-items: center; } }
+        @media (min-width: 900px) { .rp-shopname { white-space: nowrap; } .rp-subtitle { white-space: nowrap; } }
+        @media (min-width: 900px) { .rp-hdr { gap: 8px; } .rp-secondary-nav { gap: 12px; } .rp-hdr-right { gap: 14px; } .rp-hdr-btn { padding: 0 9px; } }
+        .rp-nav-new { position: relative; padding-right: 0; }
+        .rp-nav-new::after { content: 'новое'; position: absolute; right: 0; top: -13px; background: #FF3B30; color: #fff; font-size: 8px; font-weight: 800; border-radius: 999px; padding: 1px 5px; line-height: 1.35; pointer-events: none; white-space: nowrap; }
+        @media (max-width: 899px) { .rp-nav-new::after { display: none; } }
         /* ── mode-switch + chips в одну строку на desktop ── */
         .rp-mode-cats { display: flex; flex-direction: column; }
         @media (max-width: 899px) { .rp-mode-cats { position: sticky; top: 0; z-index: 100; background: var(--tg-theme-bg-color, #f7f5f2); border-bottom: 1px solid var(--theme-border, #e2ddd6); margin-top: -6px; padding-top: 6px; box-sizing: border-box; } }
@@ -1151,7 +1156,7 @@ window.history.replaceState(null, '', _u.toString());
       <div style={S.header}>
         <div className="rp-hdr">
           {/* БРЕНД */}
-          <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+          <div className="rp-brand" style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
             <img src="/images/logo-512.png" alt="" className="rp-logo" style={{ flexShrink: 0, objectFit: "cover" }} />
             <div style={{ minWidth: 0 }}>
               <h1 style={{ ...S.shopName, margin: 0 }} className="rp-shopname">{catalog.shop_name}</h1>
@@ -1166,13 +1171,13 @@ window.history.replaceState(null, '', _u.toString());
               <a href="about.html">О нас</a>
               <a href="reviews.html">Отзывы</a>
               {forBusinessEnabled && <a href="business.html" className="rp-desktop-only">Для бизнеса</a>}
-              <a href="promo.html">🏷️ Акции</a>
-              <a href="bonus.html">🎁 Бонусная карта</a>
+              <a href="promo.html">Акции</a>
+              <a href="bonus.html" className="rp-nav-new">Мои бонусы</a>
             </div>
             {/* Утилитарные действия */}
             <div className="rp-hdr-btns">
               <button className="rp-hdr-btn rp-sections-trigger" style={{ background: tgVar("secondary-bg-color", theme.bg_chip), color: tgVar("text-color", theme.text_primary) }} onClick={() => setShowSectionsMenu(v => !v)}>☰ Разделы</button>
-              <a href="where.html" className="rp-hdr-btn rp-hdr-btn-wheretobuy" style={{ background: tgVar("secondary-bg-color", theme.bg_chip), color: tgVar("text-color", theme.text_primary) }}>📍 Где купить</a>
+              <a href="where.html" className="rp-hdr-btn rp-hdr-btn-wheretobuy" style={{ background: tgVar("secondary-bg-color", theme.bg_chip), color: tgVar("text-color", theme.text_primary) }}>Где купить</a>
               {bizPhone && <a href={`tel:${bizPhone}`} className="rp-hdr-btn" style={{ background: tgVar("secondary-bg-color", theme.bg_chip), color: tgVar("text-color", theme.text_primary) }}>📞 Позвонить</a>}
               {bizPhone && <a href="https://max.ru/join/FZnl85uOe410NmUxA0dDMyFYf90-aJkBOweY_tPkUr4" target="_blank" rel="noreferrer" className="rp-hdr-btn" style={{ background: tgVar("secondary-bg-color", theme.bg_chip), color: tgVar("text-color", theme.text_primary) }}>💬 Чат MAX</a>}
             </div>
@@ -1183,7 +1188,7 @@ window.history.replaceState(null, '', _u.toString());
                 <a href="about.html" onClick={() => setShowSectionsMenu(false)}>ℹ️ О нас</a>
                 <a href="reviews.html" onClick={() => setShowSectionsMenu(false)}>⭐ Отзывы</a>
                 {forBusinessEnabled && <a href="business.html" onClick={() => setShowSectionsMenu(false)}>🏪 Для магазинов</a>}
-                <a href="bonus.html" onClick={() => setShowSectionsMenu(false)}>🎁 Бонусная карта</a>
+                <a href="bonus.html" onClick={() => setShowSectionsMenu(false)}>🎁 Мои бонусы</a>
               </div>
             )}
           </div>
