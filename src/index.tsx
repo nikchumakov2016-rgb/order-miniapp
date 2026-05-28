@@ -1167,6 +1167,7 @@ window.history.replaceState(null, '', _u.toString());
               <a href="reviews.html">Отзывы</a>
               {forBusinessEnabled && <a href="business.html" className="rp-desktop-only">Для бизнеса</a>}
               <a href="promo.html">🏷️ Акции</a>
+              <a href="bonus.html">🎁 Бонусная карта</a>
             </div>
             {/* Утилитарные действия */}
             <div className="rp-hdr-btns">
@@ -1182,6 +1183,7 @@ window.history.replaceState(null, '', _u.toString());
                 <a href="about.html" onClick={() => setShowSectionsMenu(false)}>ℹ️ О нас</a>
                 <a href="reviews.html" onClick={() => setShowSectionsMenu(false)}>⭐ Отзывы</a>
                 {forBusinessEnabled && <a href="business.html" onClick={() => setShowSectionsMenu(false)}>🏪 Для магазинов</a>}
+                <a href="bonus.html" onClick={() => setShowSectionsMenu(false)}>🎁 Бонусная карта</a>
               </div>
             )}
           </div>
