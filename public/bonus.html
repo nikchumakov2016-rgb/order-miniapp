@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Бонусная карта — Римские Пельмени</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #fbf2e8;
+      color: #2f2723;
+      min-height: 100vh;
+    }
+
+    /* ── layout ── */
+    .page {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 0 24px 80px;
+    }
+    @media (max-width: 600px) {
+      .page { padding: 0 0 60px; }
+    }
+
+    /* ── back bar ── */
+    .back-bar {
+      padding: 10px 0 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    @media (max-width: 600px) {
+      .back-bar { padding: 14px 16px; }
+    }
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #7d6f66;
+      text-decoration: none;
+      background: rgba(139,42,31,0.06);
+      border: 1px solid rgba(139,42,31,0.10);
+      border-radius: 999px;
+      padding: 6px 14px 6px 10px;
+      transition: background 0.15s;
+    }
+    .back-btn:hover { background: rgba(139,42,31,0.11); color: #2f2723; }
+    .back-brand {
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: #8B2A1F;
+      letter-spacing: 0.2px;
+    }
+
+    /* ── hero ── */
+    .hero {
+      padding: 8px 0 20px;
+    }
+    @media (max-width: 600px) {
+      .hero { padding: 6px 16px 20px; }
+    }
+    .hero-h1 {
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-size: 48px;
+      font-weight: 700;
+      line-height: 1.08;
+      color: #1c110a;
+      letter-spacing: -0.5px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 600px) { .hero-h1 { font-size: 34px; } }
+    .hero-lead {
+      font-size: 15px;
+      line-height: 1.65;
+      color: #4a3e38;
+    }
+    @media (max-width: 600px) { .hero-lead { font-size: 14px; } }
+
+    /* ── divider ── */
+    .divider {
+      height: 1px;
+      background: rgba(139,42,31,0.10);
+      margin: 4px 0 20px;
+    }
+    @media (max-width: 600px) {
+      .divider { margin: 4px 16px 20px; }
+    }
+
+    /* ── card ── */
+    .card {
+      background: rgba(255,250,244,0.85);
+      border: 1px solid rgba(139,42,31,0.12);
+      border-radius: 18px;
+      padding: 22px 24px;
+      box-shadow: 0 3px 14px rgba(80,45,25,0.05);
+      margin-bottom: 16px;
+    }
+    @media (max-width: 600px) {
+      .card { margin: 0 16px 16px; border-radius: 16px; padding: 18px 18px; }
+    }
+
+    .card-title {
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: #8B2A1F;
+      margin-bottom: 16px;
+      letter-spacing: 0.1px;
+    }
+
+    /* ── form ── */
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #7d6f66;
+      margin-bottom: 6px;
+      letter-spacing: 0.2px;
+    }
+    .field input {
+      width: 100%;
+      font-size: 16px;
+      font-family: inherit;
+      color: #2f2723;
+      background: #fff;
+      border: 1px solid rgba(139,42,31,0.20);
+      border-radius: 10px;
+      padding: 11px 14px;
+      outline: none;
+      transition: border-color 0.15s;
+      -webkit-appearance: none;
+    }
+    .field input:focus {
+      border-color: rgba(139,42,31,0.55);
+    }
+    .field input::placeholder { color: #b0a090; }
+
+    .submit-btn {
+      width: 100%;
+      background: #8B2A1F;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      font-family: inherit;
+      padding: 14px 20px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      margin-top: 4px;
+    }
+    .submit-btn:hover:not(:disabled) { opacity: 0.88; }
+    .submit-btn:disabled { opacity: 0.55; cursor: default; }
+
+    /* ── error ── */
+    .error-block {
+      display: none;
+      background: rgba(139,42,31,0.07);
+      border: 1px solid rgba(139,42,31,0.18);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-top: 14px;
+      font-size: 14px;
+      color: #8B2A1F;
+      line-height: 1.5;
+    }
+
+    /* ── balance card ── */
+    .balance-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+    @media (max-width: 400px) {
+      .balance-grid { grid-template-columns: 1fr; }
+    }
+    .balance-item {
+      background: rgba(139,42,31,0.05);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .balance-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.7px;
+      text-transform: uppercase;
+      color: #8B2A1F;
+      opacity: 0.7;
+      margin-bottom: 4px;
+    }
+    .balance-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1c110a;
+      line-height: 1.1;
+    }
+    .balance-sub {
+      font-size: 12px;
+      color: #7d6f66;
+      margin-top: 3px;
+    }
+    .phone-masked-line {
+      font-size: 13px;
+      color: #7d6f66;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(139,42,31,0.09);
+    }
+
+    /* ── section heading ── */
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: #8B2A1F;
+      opacity: 0.75;
+      margin-bottom: 12px;
+    }
+
+    /* ── transaction list ── */
+    .tx-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .tx-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    .tx-sign {
+      flex-shrink: 0;
+      font-size: 16px;
+      font-weight: 700;
+      width: 22px;
+      text-align: center;
+      margin-top: 1px;
+    }
+    .tx-sign.plus  { color: #1a6e30; }
+    .tx-sign.minus { color: #8B2A1F; }
+    .tx-body { flex: 1; }
+    .tx-label { color: #2f2723; font-weight: 600; }
+    .tx-meta  { font-size: 12px; color: #7d6f66; margin-top: 2px; }
+    .tx-amount {
+      flex-shrink: 0;
+      font-weight: 700;
+      font-size: 15px;
+      margin-top: 1px;
+    }
+    .tx-amount.plus  { color: #1a6e30; }
+    .tx-amount.minus { color: #8B2A1F; }
+
+    /* ── orders list ── */
+    .order-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .order-item {
+      background: rgba(139,42,31,0.04);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .order-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+    .order-status {
+      font-weight: 700;
+      color: #2f2723;
+    }
+    .order-status.done     { color: #1a6e30; }
+    .order-status.rejected { color: #8B2A1F; }
+    .order-total {
+      margin-left: auto;
+      font-weight: 700;
+      color: #2f2723;
+    }
+    .order-meta {
+      font-size: 12px;
+      color: #7d6f66;
+      margin-top: 5px;
+      line-height: 1.5;
+    }
+
+    /* ── order items ── */
+    .order-items {
+      list-style: none;
+      margin: 7px 0 5px;
+      font-size: 13px;
+      color: #4a3e38;
+      line-height: 1.6;
+    }
+    .order-items li + li { margin-top: 1px; }
+
+    /* ── empty state ── */
+    .empty-msg {
+      font-size: 14px;
+      color: #7d6f66;
+      padding: 4px 0 8px;
+    }
+
+    /* ── result back link ── */
+    .result-back {
+      display: inline-block;
+      font-size: 14px;
+      font-weight: 600;
+      color: #8B2A1F;
+      text-decoration: none;
+      border: 1px solid rgba(139,42,31,0.20);
+      border-radius: 999px;
+      padding: 8px 18px;
+      margin-bottom: 4px;
+      transition: background 0.15s;
+      cursor: pointer;
+      background: none;
+    }
+    .result-back:hover { background: rgba(139,42,31,0.07); }
+
+    /* ── cta section ── */
+    .cta-section {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    @media (max-width: 600px) {
+      .cta-section { padding: 0 16px; flex-direction: column; }
+    }
+    .cta-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      min-width: 160px;
+      background: #8B2A1F;
+      color: #fff;
+      text-decoration: none;
+      font-size: 16px;
+      font-weight: 700;
+      padding: 15px 24px;
+      border-radius: 14px;
+      letter-spacing: 0.1px;
+      transition: opacity 0.15s;
+    }
+    .cta-btn:hover { opacity: 0.88; }
+    .cta-btn-secondary {
+      background: rgba(139,42,31,0.07);
+      color: #8B2A1F;
+      border: 1px solid rgba(139,42,31,0.15);
+    }
+    .cta-btn-secondary:hover { background: rgba(139,42,31,0.13); opacity: 1; }
+    @media (max-width: 600px) {
+      .cta-btn { font-size: 15px; padding: 14px 20px; border-radius: 12px; min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- back bar -->
+    <div class="back-bar">
+      <a href="/" class="back-btn">← Назад</a>
+      <span class="back-brand">Римские Пельмени</span>
+    </div>
+
+    <!-- hero -->
+    <div class="hero">
+      <h1 class="hero-h1">Бонусная карта</h1>
+      <p class="hero-lead">
+        Введите номер телефона и код карты, чтобы посмотреть баланс и историю бонусов.
+        Код можно получить после выполненного заказа или уточнить у продавца.
+      </p>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- form section -->
+    <div id="form-section">
+      <div class="card">
+        <div class="card-title">Войти в кабинет</div>
+        <form id="bonus-form" autocomplete="off" novalidate>
+          <div class="field">
+            <label for="inp-phone">Телефон</label>
+            <input
+              id="inp-phone"
+              type="tel"
+              inputmode="tel"
+              placeholder="+7 900 000-00-00"
+              autocomplete="off"
+              required
+            >
+          </div>
+          <div class="field">
+            <label for="inp-pin">Код карты</label>
+            <input
+              id="inp-pin"
+              type="text"
+              inputmode="numeric"
+              maxlength="5"
+              placeholder="5 цифр"
+              autocomplete="off"
+              required
+            >
+          </div>
+          <button type="submit" class="submit-btn" id="submit-btn">Показать бонусы</button>
+          <div class="error-block" id="error-block"></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- result section (hidden) -->
+    <div id="result-section" style="display:none">
+
+      <!-- balance card -->
+      <div class="card">
+        <div class="card-title">Ваша карта</div>
+        <div class="balance-grid">
+          <div class="balance-item">
+            <div class="balance-label">Баланс</div>
+            <div class="balance-value" id="res-balance">—</div>
+            <div class="balance-sub">бонусов</div>
+          </div>
+          <div class="balance-item">
+            <div class="balance-label">Доступно</div>
+            <div class="balance-value" id="res-available">—</div>
+            <div class="balance-sub">к списанию</div>
+          </div>
+        </div>
+        <div class="phone-masked-line" id="res-phone"></div>
+      </div>
+
+      <!-- transactions -->
+      <div class="card" id="tx-card">
+        <div class="section-title">История операций</div>
+        <ul class="tx-list" id="tx-list"></ul>
+      </div>
+
+      <!-- orders -->
+      <div class="card" id="orders-card">
+        <div class="section-title">История заказов</div>
+        <ul class="order-list" id="orders-list"></ul>
+      </div>
+
+      <!-- back to form -->
+      <div style="text-align:center; margin-bottom:20px;">
+        <button class="result-back" id="result-back-btn">← Проверить другую карту</button>
+      </div>
+
+    </div>
+
+    <!-- cta -->
+    <div class="cta-section">
+      <a href="tel:+79228810468" class="cta-btn">Позвонить</a>
+      <a href="/" class="cta-btn cta-btn-secondary">На витрину →</a>
+    </div>
+
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+      var TX_TYPE_LABEL = {
+        EARNED:        'Начислено',
+        SPENT:         'Списано',
+        RESERVED:      'Зарезервировано',
+        RELEASED:      'Резерв снят',
+        EARN_REVERSED: 'Откат начисления',
+        SPEND_REVERSED:'Откат списания',
+        ADMIN_ADD:     'Корректировка +',
+        ADMIN_DEDUCT:  'Корректировка −'
+      };
+
+      var TX_PLUS = { EARNED: 1, SPEND_REVERSED: 1, ADMIN_ADD: 1 };
+
+      var STATUS_LABEL = {
+        NEW:        'Новый',
+        PREPARING:  'Готовится',
+        READY:      'Готов',
+        DELIVERING: 'Доставляется',
+        DONE:       'Выполнен',
+        REJECTED:   'Отменён'
+      };
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function fmtDate(s) {
+        if (!s) return '';
+        var m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+        if (!m) return s;
+        return m[3] + '.' + m[2] + '.' + m[1] + ' ' + m[4] + ':' + m[5];
+      }
+
+      function showError(msg) {
+        var el = document.getElementById('error-block');
+        el.textContent = msg;
+        el.style.display = 'block';
+      }
+
+      function hideError() {
+        var el = document.getElementById('error-block');
+        el.textContent = '';
+        el.style.display = 'none';
+      }
+
+      function showResult(data) {
+        var card = data.card;
+        document.getElementById('res-balance').textContent   = card.balance;
+        document.getElementById('res-available').textContent = card.available_balance;
+        document.getElementById('res-phone').textContent     = 'Карта: ' + escapeHtml(card.phone_masked);
+
+        // transactions
+        var txList = document.getElementById('tx-list');
+        txList.innerHTML = '';
+        if (!data.transactions || !data.transactions.length) {
+          txList.innerHTML = '<li class="empty-msg">История операций пуста</li>';
+        } else {
+          data.transactions.forEach(function (t) {
+            var isPlus = !!TX_PLUS[t.type];
+            var signCls = isPlus ? 'plus' : 'minus';
+            var sign    = isPlus ? '+' : '−';
+            var label   = escapeHtml(t.label || TX_TYPE_LABEL[t.type] || t.type);
+            var meta    = fmtDate(t.created_at);
+            if (t.order_total) meta += ' · заказ ' + t.order_total + ' ₽';
+            var li = document.createElement('li');
+            li.className = 'tx-item';
+            li.innerHTML =
+              '<span class="tx-sign ' + signCls + '">' + sign + '</span>' +
+              '<span class="tx-body">' +
+                '<span class="tx-label">' + label + '</span>' +
+                '<div class="tx-meta">' + escapeHtml(meta) + '</div>' +
+              '</span>' +
+              '<span class="tx-amount ' + signCls + '">' + escapeHtml(String(t.amount)) + '</span>';
+            txList.appendChild(li);
+          });
+        }
+
+        // orders
+        var orders = data.orders || [];
+        var ordersList = document.getElementById('orders-list');
+        ordersList.innerHTML = '';
+        if (!orders.length) {
+          ordersList.innerHTML = '<li class="empty-msg">История заказов пуста</li>';
+        } else {
+          orders.forEach(function (o) {
+            var statusText = STATUS_LABEL[o.status] || escapeHtml(o.status);
+            var statusCls  = o.status === 'DONE' ? 'done' : o.status === 'REJECTED' ? 'rejected' : '';
+            var meta = [];
+            meta.push(fmtDate(o.created_at));
+            if (o.bonus_earned > 0) meta.push('начислено ' + o.bonus_earned + ' бонусов');
+            if (o.bonus_spent  > 0) meta.push('списано '   + o.bonus_spent  + ' бонусов');
+            if (o.bonus_card_created) meta.push('карта создана');
+            if (o.bonus_earn_reversed_at) meta.push('начисление отменено');
+            // items list
+            var itemsHtml = '';
+            if (o.items && o.items.length) {
+              itemsHtml = '<ul class="order-items">' +
+                o.items.map(function (it) {
+                  var s = escapeHtml(it.name || '—');
+                  if (it.qty && it.qty !== 1) s += ' × ' + it.qty;
+                  if (it.unit) s += ' ' + escapeHtml(it.unit);
+                  if (it.price_rub) s += ' · ' + it.price_rub + ' ₽';
+                  return '<li>' + s + '</li>';
+                }).join('') +
+              '</ul>';
+            }
+            var li = document.createElement('li');
+            li.className = 'order-item';
+            li.innerHTML =
+              '<div class="order-row">' +
+                '<span class="order-status ' + statusCls + '">' + statusText + '</span>' +
+                '<span class="order-total">' + escapeHtml(String(o.total_rub)) + ' ₽</span>' +
+              '</div>' +
+              '<div class="order-meta">' + escapeHtml(meta.join(' · ')) + '</div>' +
+              itemsHtml;
+            ordersList.appendChild(li);
+          });
+        }
+
+        document.getElementById('form-section').style.display   = 'none';
+        document.getElementById('result-section').style.display = '';
+      }
+
+      function resetToForm() {
+        document.getElementById('result-section').style.display = 'none';
+        document.getElementById('form-section').style.display   = '';
+        document.getElementById('inp-pin').value = '';
+        hideError();
+      }
+
+      document.getElementById('result-back-btn').addEventListener('click', resetToForm);
+
+
+      document.getElementById('bonus-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        hideError();
+
+        var phoneVal = (document.getElementById('inp-phone').value || '').trim();
+        var pinEl    = document.getElementById('inp-pin');
+        var pinVal   = (pinEl.value || '').trim();
+
+        if (!phoneVal) { showError('Введите номер телефона.'); return; }
+        if (!pinVal)   { showError('Введите код карты.'); return; }
+
+        var btn = document.getElementById('submit-btn');
+        btn.disabled    = true;
+        btn.textContent = 'Загружаем…';
+
+        fetch('/api/bonus-card/details', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: phoneVal, pin: pinVal })
+        })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+          .then(function (res) {
+            pinEl.value = '';           // clear PIN regardless of outcome
+            btn.disabled    = false;
+            btn.textContent = 'Показать бонусы';
+
+            if (!res.ok || !res.data.ok) {
+              showError('Телефон или код карты не подошли. Проверьте данные или уточните код у продавца.');
+              return;
+            }
+            showResult(res.data);
+          })
+          .catch(function () {
+            pinEl.value = '';
+            btn.disabled    = false;
+            btn.textContent = 'Показать бонусы';
+            showError('Не удалось подключиться. Проверьте интернет и попробуйте снова.');
+          });
+      });
+    }());
+  </script>
+</body>
+</html>
