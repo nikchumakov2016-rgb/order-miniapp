@@ -250,8 +250,9 @@
       text-align: center;
       margin-top: 1px;
     }
-    .tx-sign.plus  { color: #1a6e30; }
-    .tx-sign.minus { color: #8B2A1F; }
+    .tx-sign.plus    { color: #1a6e30; }
+    .tx-sign.minus   { color: #8B2A1F; }
+    .tx-sign.neutral { color: #7d6f66; }
     .tx-body { flex: 1; }
     .tx-label { color: #2f2723; font-weight: 600; }
     .tx-meta  { font-size: 12px; color: #7d6f66; margin-top: 2px; }
@@ -261,8 +262,9 @@
       font-size: 15px;
       margin-top: 1px;
     }
-    .tx-amount.plus  { color: #1a6e30; }
-    .tx-amount.minus { color: #8B2A1F; }
+    .tx-amount.plus    { color: #1a6e30; }
+    .tx-amount.minus   { color: #8B2A1F; }
+    .tx-amount.neutral { color: #7d6f66; }
 
     /* ── orders list ── */
     .order-list {
@@ -488,7 +490,8 @@
         ADMIN_DEDUCT:  'Корректировка −'
       };
 
-      var TX_PLUS = { EARNED: 1, SPEND_REVERSED: 1, ADMIN_ADD: 1 };
+      var TX_PLUS    = { EARNED: 1, SPEND_REVERSED: 1, ADMIN_ADD: 1 };
+      var TX_NEUTRAL = { RESERVED: 1, RELEASED: 1 };
 
       var STATUS_LABEL = {
         NEW:        'Новый',
@@ -540,9 +543,10 @@
           txList.innerHTML = '<li class="empty-msg">История операций пуста</li>';
         } else {
           data.transactions.forEach(function (t) {
-            var isPlus = !!TX_PLUS[t.type];
-            var signCls = isPlus ? 'plus' : 'minus';
-            var sign    = isPlus ? '+' : '−';
+            var isPlus    = !!TX_PLUS[t.type];
+            var isNeutral = !!TX_NEUTRAL[t.type];
+            var signCls = isNeutral ? 'neutral' : (isPlus ? 'plus' : 'minus');
+            var sign    = isNeutral ? '' : (isPlus ? '+' : '−');
             var label   = escapeHtml(t.label || TX_TYPE_LABEL[t.type] || t.type);
             var meta    = fmtDate(t.created_at);
             if (t.order_total) meta += ' · заказ ' + t.order_total + ' ₽';
