@@ -385,6 +385,8 @@ function App() {
 
   const [cart, setCart] = useState<Record<string, CartEntry>>({});
   const [showCart, setShowCart] = useState(false);
+  const pendingRepeatRef = useRef(false);
+  const [repeatNotice, setRepeatNotice] = useState<{ skipped: boolean; mixed: boolean } | null>(null);
   const cartRef = useRef<HTMLDivElement>(null);
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
@@ -444,6 +446,13 @@ const isScheduledTimeInFuture =
   }, [isWorkingHours, deliveryMode]);
 
   useEffect(() => {
+    const _p = new URLSearchParams(window.location.search);
+    if (_p.get('repeat_order') === '1') {
+      pendingRepeatRef.current = true;
+      _p.delete('repeat_order');
+      const _qs = _p.toString();
+      window.history.replaceState(null, '', window.location.pathname + (_qs ? '?' + _qs : ''));
+    }
     if (new URLSearchParams(window.location.search).get('cart') === 'open') {
       setShowCart(true);
       window.history.replaceState(null, '', window.location.pathname);
@@ -486,6 +495,64 @@ const isScheduledTimeInFuture =
   useEffect(() => {
     if (showPromos) loadPromotions();
   }, [showPromos, loadPromotions]);
+
+  // repeat-order: restore cart from sessionStorage after catalog loads
+  useEffect(() => {
+    if (!catalog || !pendingRepeatRef.current) return;
+    pendingRepeatRef.current = false;
+
+    const raw = sessionStorage.getItem('repeat_order_items');
+    sessionStorage.removeItem('repeat_order_items');
+    if (!raw) return;
+
+    let payload: { id: string; qty: number; item_order_mode?: string }[];
+    try { payload = JSON.parse(raw); } catch { return; }
+    if (!Array.isArray(payload) || !payload.length) return;
+
+    // flat index of all catalog items
+    const itemMap = new Map<string, CatalogItem>();
+    for (const cat of [...(catalog.categories ?? []), ...(catalog.hot_categories ?? [])]) {
+      for (const item of cat.items) itemMap.set(item.id, item);
+    }
+
+    let skipped = 0;
+    const patch: Record<string, CartEntry> = {};
+    for (const entry of payload) {
+      if (!entry.id || typeof entry.id !== 'string') { skipped++; continue; }
+      const qty = Math.floor(Number(entry.qty));
+      if (!qty || qty <= 0 || qty > 99) { skipped++; continue; }
+      const catalogItem = itemMap.get(entry.id);
+      if (!catalogItem || catalogItem.in_stock === false) { skipped++; continue; }
+      const orderMode = (entry.item_order_mode === 'hot' || entry.item_order_mode === 'frozen')
+        ? entry.item_order_mode : 'frozen';
+      patch[entry.id] = { item: { ...catalogItem, _orderMode: orderMode }, qty };
+    }
+
+    if (!Object.keys(patch).length) {
+      setRepeatNotice({ skipped: true, mixed: false });
+      setShowCart(true);
+      return;
+    }
+
+    // detect mode from added items
+    const addedModes = new Set(Object.values(patch).map(e => e.item._orderMode ?? 'frozen'));
+    const isMixed = addedModes.size > 1;
+    if (!isMixed) {
+      const detectedMode = [...addedModes][0] as 'frozen' | 'hot';
+      setMode(detectedMode);
+      setActiveCatId(null);
+    }
+
+    setCart(prev => ({ ...prev, ...patch }));
+    setRepeatNotice({ skipped: skipped > 0, mixed: isMixed });
+    setShowCart(true);
+  }, [catalog]);
+
+  useEffect(() => {
+    if (!repeatNotice) return;
+    const t = setTimeout(() => setRepeatNotice(null), 7000);
+    return () => clearTimeout(t);
+  }, [repeatNotice]);
 
   useEffect(() => {
     const refresh = () => {
@@ -1142,6 +1209,16 @@ window.history.replaceState(null, '', _u.toString());
         ТЕСТОВЫЙ РЕЖИМ
         <button onClick={() => { sessionStorage.removeItem('is_test'); setIsTest(false); }} style={{background:'none',border:'1px solid rgba(255,255,255,0.5)',color:'#fff',borderRadius:4,padding:'1px 7px',cursor:'pointer',fontSize:10,fontWeight:400,letterSpacing:0}}>Выйти</button>
       </div>}
+      {repeatNotice && (
+        <div style={{position:'fixed',top:isTest?28:0,left:0,right:0,zIndex:9998,background:'#1a6e30',color:'#fff',fontSize:12,fontWeight:600,padding:'6px 16px',display:'flex',alignItems:'center',gap:8}}>
+          <span style={{flex:1}}>
+            {'Товары из прошлого заказа добавлены в корзину. Проверьте состав перед оформлением.'}
+            {repeatNotice.skipped && ' Часть товаров сейчас недоступна и не была добавлена.'}
+            {repeatNotice.mixed && ' В корзине — товары из разных режимов меню. Внимательно проверьте состав.'}
+          </span>
+          <button onClick={() => setRepeatNotice(null)} style={{background:'none',border:'1px solid rgba(255,255,255,.5)',color:'#fff',borderRadius:4,padding:'1px 7px',cursor:'pointer',fontSize:11,flexShrink:0}}>×</button>
+        </div>
+      )}
       {freeFrom > 0 && (
         <div style={{
           background: theme.accent_announcement, color: "#f5e9d6",

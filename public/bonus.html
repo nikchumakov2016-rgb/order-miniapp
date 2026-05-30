@@ -311,6 +311,8 @@
       line-height: 1.6;
     }
     .order-items li + li { margin-top: 1px; }
+    .repeat-btn { margin-top: 8px; padding: 5px 14px; border-radius: 8px; border: none; background: #3390ec; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .repeat-btn:hover { background: #2779d4; }
 
     /* ── empty state ── */
     .empty-msg {
@@ -518,6 +520,22 @@
         return m[3] + '.' + m[2] + '.' + m[1] + ' ' + m[4] + ':' + m[5];
       }
 
+      function buildRepeatPayload(items) {
+        var VALID_MODES = { frozen: 1, hot: 1 };
+        var result = [];
+        for (var i = 0; i < items.length; i++) {
+          var it = items[i];
+          if (!it.id || typeof it.id !== 'string') continue;
+          var qty = Number(it.qty);
+          if (!qty || qty <= 0 || qty > 99) continue;
+          var entry = { id: it.id, qty: Math.floor(qty) };
+          if (it.item_order_mode && VALID_MODES[it.item_order_mode])
+            entry.item_order_mode = it.item_order_mode;
+          result.push(entry);
+        }
+        return result;
+      }
+
       function bonusWord(n) {
         var abs = Math.abs(n) % 100;
         var m   = abs % 10;
@@ -610,6 +628,7 @@
                 }).join('') +
               '</ul>';
             }
+            var canRepeat = o.status === 'DONE' && o.items && o.items.length;
             var li = document.createElement('li');
             li.className = 'order-item';
             li.innerHTML =
@@ -618,8 +637,21 @@
                 '<span class="order-total">' + escapeHtml(String(o.total_rub)) + ' ₽</span>' +
               '</div>' +
               '<div class="order-meta">' + escapeHtml(meta.join(' · ')) + '</div>' +
-              itemsHtml;
+              itemsHtml +
+              (canRepeat ? '<button class="repeat-btn" type="button">Повторить заказ</button>' : '');
             ordersList.appendChild(li);
+            if (canRepeat) {
+              (function(order) {
+                li.querySelector('.repeat-btn').addEventListener('click', function() {
+                  var payload = buildRepeatPayload(order.items);
+                  if (!payload.length) { alert('Нет доступных товаров для повтора.'); return; }
+                  sessionStorage.setItem('repeat_order_items', JSON.stringify(payload));
+                  var isTestMode = new URLSearchParams(window.location.search).get('test') === '1'
+                                   || sessionStorage.getItem('is_test') === '1';
+                  window.location.href = isTestMode ? '/?test=1&repeat_order=1' : '/?repeat_order=1';
+                });
+              }(o));
+            }
           });
         }
 
