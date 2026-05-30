@@ -19,7 +19,7 @@
 
     /* ── layout ── */
     .page {
-      max-width: 640px;
+      max-width: 1180px;
       margin: 0 auto;
       padding: 0 24px 80px;
     }
@@ -63,6 +63,7 @@
     /* ── hero ── */
     .hero {
       padding: 8px 0 20px;
+      max-width: 640px;
     }
     @media (max-width: 600px) {
       .hero { padding: 6px 16px 20px; }
@@ -337,6 +338,10 @@
       background: none;
     }
     .result-back:hover { background: rgba(139,42,31,0.07); }
+
+    @media (min-width: 900px) {
+      #form-section, #result-section, .cta-section { max-width: 680px; }
+    }
 
     /* ── cta section ── */
     .cta-section {
