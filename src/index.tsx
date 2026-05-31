@@ -512,7 +512,7 @@ const isScheduledTimeInFuture =
     // flat index of all catalog items
     const itemMap = new Map<string, CatalogItem>();
     for (const cat of [...(catalog.categories ?? []), ...(catalog.hot_categories ?? [])]) {
-      for (const item of cat.items) itemMap.set(item.id, item);
+      for (const item of cat.items) itemMap.set(item.id, { ...item, category: cat.name });
     }
 
     let skipped = 0;

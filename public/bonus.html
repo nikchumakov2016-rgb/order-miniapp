@@ -218,6 +218,63 @@
       border-top: 1px solid rgba(139,42,31,0.09);
     }
 
+    /* ── bonus card visual ── */
+    .bonus-card-visual {
+      background: linear-gradient(145deg, #6b1d13 0%, #8B2A1F 55%, #b3432e 100%);
+      border-radius: 18px;
+      padding: 22px 24px;
+      box-shadow: 0 4px 18px rgba(80,20,10,0.25);
+      color: rgba(255,245,230,0.95);
+    }
+    @media (max-width: 600px) {
+      .bonus-card-visual { margin: 0 16px; border-radius: 16px; padding: 18px; }
+    }
+    @media (min-width: 900px) {
+      .bonus-card-visual {
+        display: flex;
+        flex-direction: column;
+      }
+      .bonus-card-visual .phone-masked-line {
+        margin-top: auto;
+      }
+    }
+    .bcv-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 4px;
+    }
+    .bcv-brand {
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-size: 16px;
+      font-weight: 700;
+      opacity: 0.9;
+      letter-spacing: 0.2px;
+    }
+    .bcv-cashback {
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .bcv-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      opacity: 0.65;
+      margin-bottom: 18px;
+    }
+    .bonus-card-visual .balance-grid   { margin-bottom: 0; }
+    .bonus-card-visual .balance-item   { background: rgba(255,255,255,0.10); }
+    .bonus-card-visual .balance-label  { color: rgba(255,245,230,0.65); opacity: 1; }
+    .bonus-card-visual .balance-value  { color: #fff; }
+    .bonus-card-visual .balance-sub    { color: rgba(255,245,230,0.65); }
+    .bonus-card-visual .phone-masked-line {
+      color: rgba(255,245,230,0.70);
+      border-top-color: rgba(255,245,230,0.15);
+    }
+
     /* ── section heading ── */
     .section-title {
       font-size: 13px;
@@ -339,8 +396,78 @@
     }
     .result-back:hover { background: rgba(139,42,31,0.07); }
 
+    /* ── desktop width cap for CTA ── */
     @media (min-width: 900px) {
-      #form-section, #result-section, .cta-section { max-width: 680px; }
+      .cta-section { max-width: 680px; margin-left: auto; margin-right: auto; }
+    }
+
+    /* ── two-column layout ── */
+    #form-section {
+      display: grid;
+      grid-template-columns: minmax(0, 660px) 1fr;
+      gap: 32px;
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      #form-section { display: block; }
+    }
+
+    .result-columns {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px 32px;
+      align-items: stretch;
+    }
+    .result-columns > .card,
+    .result-columns > .how-card,
+    .result-columns > .bonus-card-visual { margin-bottom: 0; }
+    @media (max-width: 900px) {
+      .result-columns { display: block; }
+      .result-columns > * { margin-bottom: 0; }
+      .result-columns > * + * { margin-top: 16px; }
+    }
+
+    /* ── how-card ── */
+    .how-card {
+      background: rgba(255,250,244,0.85);
+      border: 1px solid rgba(139,42,31,0.12);
+      border-radius: 18px;
+      padding: 22px 24px;
+      box-shadow: 0 3px 14px rgba(80,45,25,0.05);
+      margin-bottom: 16px;
+    }
+    @media (max-width: 600px) {
+      .how-card { margin: 0 16px 16px; border-radius: 16px; padding: 18px 18px; }
+    }
+    .how-card-title {
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: #8B2A1F;
+      margin-bottom: 14px;
+      letter-spacing: 0.1px;
+    }
+    .how-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .how-list li {
+      font-size: 14px;
+      line-height: 1.55;
+      color: #4a3e38;
+      padding-left: 20px;
+      position: relative;
+    }
+    .how-list li::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      color: #8B2A1F;
+      font-weight: 700;
     }
 
     /* ── cta section ── */
@@ -394,7 +521,7 @@
     <div class="hero">
       <h1 class="hero-h1">Бонусная карта</h1>
       <p class="hero-lead">
-        Введите номер телефона и код карты, чтобы посмотреть баланс и историю бонусов.
+        Введите номер телефона и код карты, чтобы посмотреть баланс и историю операций.
         Код можно получить после выполненного заказа или уточнить у продавца.
       </p>
     </div>
@@ -429,47 +556,74 @@
               required
             >
           </div>
-          <button type="submit" class="submit-btn" id="submit-btn">Показать бонусы</button>
+          <button type="submit" class="submit-btn" id="submit-btn">Показать карту</button>
           <div class="error-block" id="error-block"></div>
         </form>
+      </div>
+      <div class="how-card">
+        <div class="how-card-title">Как работает карта</div>
+        <ul class="how-list">
+          <li>Электронная карта оформляется после первого выполненного заказа от 1&#8239;500&#8239;₽.</li>
+          <li>За покупки начисляется 5% бонусными рублями.</li>
+          <li>1 бонусный рубль = 1&#8239;₽.</li>
+          <li>Бонусными рублями можно оплатить до 50% суммы заказа.</li>
+          <li>Если в заказе списываются бонусные рубли, новые бонусные рубли за него не начисляются.</li>
+          <li>Код карты можно получить после выполненного заказа или уточнить у продавца.</li>
+        </ul>
       </div>
     </div>
 
     <!-- result section (hidden) -->
     <div id="result-section" style="display:none">
 
-      <!-- balance card -->
-      <div class="card">
-        <div class="card-title">Ваша карта</div>
-        <div class="balance-grid">
-          <div class="balance-item">
-            <div class="balance-label">Баланс</div>
-            <div class="balance-value" id="res-balance">—</div>
-            <div class="balance-sub">бонусов</div>
+      <div class="result-columns">
+        <!-- row 1, col 1 -->
+        <div class="bonus-card-visual">
+          <div class="bcv-header">
+            <span class="bcv-brand">Римские Пельмени</span>
+            <span class="bcv-cashback">5%</span>
           </div>
-          <div class="balance-item">
-            <div class="balance-label">Доступно</div>
-            <div class="balance-value" id="res-available">—</div>
-            <div class="balance-sub">к списанию</div>
+          <div class="bcv-title">Электронная бонусная карта</div>
+          <div class="balance-grid">
+            <div class="balance-item">
+              <div class="balance-label">Баланс</div>
+              <div class="balance-value" id="res-balance">—</div>
+              <div class="balance-sub">бонусных рублей</div>
+            </div>
+            <div class="balance-item">
+              <div class="balance-label">Доступно</div>
+              <div class="balance-value" id="res-available">—</div>
+              <div class="balance-sub">к списанию</div>
+            </div>
           </div>
+          <div class="phone-masked-line" id="res-phone"></div>
         </div>
-        <div class="phone-masked-line" id="res-phone"></div>
+        <!-- row 1, col 2 -->
+        <div class="how-card">
+          <div class="how-card-title">Как работает карта</div>
+          <ul class="how-list">
+            <li>Электронная карта оформляется после первого выполненного заказа от 1&#8239;500&#8239;₽.</li>
+            <li>За покупки начисляется 5% бонусными рублями.</li>
+            <li>1 бонусный рубль = 1&#8239;₽.</li>
+            <li>Бонусными рублями можно оплатить до 50% суммы заказа.</li>
+            <li>Если в заказе списываются бонусные рубли, новые бонусные рубли за него не начисляются.</li>
+            <li>Код карты можно получить после выполненного заказа или уточнить у продавца.</li>
+          </ul>
+        </div>
+        <!-- row 2, col 1 -->
+        <div class="card" id="tx-card">
+          <div class="section-title">История операций</div>
+          <ul class="tx-list" id="tx-list"></ul>
+        </div>
+        <!-- row 2, col 2 -->
+        <div class="card" id="orders-card">
+          <div class="section-title">История заказов</div>
+          <ul class="order-list" id="orders-list"></ul>
+        </div>
       </div>
 
-      <!-- transactions -->
-      <div class="card" id="tx-card">
-        <div class="section-title">История операций</div>
-        <ul class="tx-list" id="tx-list"></ul>
-      </div>
-
-      <!-- orders -->
-      <div class="card" id="orders-card">
-        <div class="section-title">История заказов</div>
-        <ul class="order-list" id="orders-list"></ul>
-      </div>
-
-      <!-- back to form -->
-      <div style="text-align:center; margin-bottom:20px;">
+      <!-- result-back-btn скрыт, но id сохранён для JS -->
+      <div style="display:none">
         <button class="result-back" id="result-back-btn">← Проверить другую карту</button>
       </div>
 
@@ -502,12 +656,32 @@
 
       var STATUS_LABEL = {
         NEW:        'Новый',
+        ACCEPTED:   'Принят',
+        COOKING:    'Готовится',
         PREPARING:  'Готовится',
         READY:      'Готов',
+        ONWAY:      'В пути',
         DELIVERING: 'Доставляется',
         DONE:       'Выполнен',
         REJECTED:   'Отменён'
       };
+
+      // ── runtime state (PIN never touches storage) ──
+      var currentCardPhone = null;
+      var currentCardPin   = null;
+      var pollInterval     = null;
+
+      function stopPolling() {
+        if (pollInterval !== null) { clearInterval(pollInterval); pollInterval = null; }
+      }
+
+      function startPolling() {
+        stopPolling();
+        pollInterval = setInterval(function () {
+          if (document.visibilityState !== 'visible') return;
+          loadCardDetails({ silent: true });
+        }, 20000);
+      }
 
       function escapeHtml(s) {
         return String(s)
@@ -541,13 +715,13 @@
         return result;
       }
 
-      function bonusWord(n) {
+      function bonusRubWord(n) {
         var abs = Math.abs(n) % 100;
         var m   = abs % 10;
-        if (abs >= 11 && abs <= 19) return 'бонусов';
-        if (m === 1)                return 'бонус';
-        if (m >= 2 && m <= 4)       return 'бонуса';
-        return 'бонусов';
+        if (abs >= 11 && abs <= 19) return 'бонусных рублей';
+        if (m === 1)                return 'бонусный рубль';
+        if (m >= 2 && m <= 4)       return 'бонусных рубля';
+        return 'бонусных рублей';
       }
 
       function showError(msg) {
@@ -562,7 +736,9 @@
         el.style.display = 'none';
       }
 
-      function showResult(data) {
+      // Renders balance, transactions and orders into DOM.
+      // Does NOT toggle section visibility — callers handle that.
+      function renderCardData(data) {
         var card = data.card;
         document.getElementById('res-balance').textContent   = card.balance;
         document.getElementById('res-available').textContent = card.available_balance;
@@ -603,21 +779,22 @@
           ordersList.innerHTML = '<li class="empty-msg">История заказов пуста</li>';
         } else {
           orders.forEach(function (o) {
-            var statusText = STATUS_LABEL[o.status] || escapeHtml(o.status);
-            var statusCls  = o.status === 'DONE' ? 'done' : o.status === 'REJECTED' ? 'rejected' : '';
+            var statusUpper = String(o.status || '').toUpperCase();
+            var statusText  = STATUS_LABEL[statusUpper] || escapeHtml(String(o.status || ''));
+            var statusCls   = statusUpper === 'DONE' ? 'done' : statusUpper === 'REJECTED' ? 'rejected' : '';
             var meta = [];
             meta.push(fmtDate(o.created_at));
             if (o.bonus_earned > 0) {
               if (o.bonus_earn_reversed_at)
-                meta.push('начисление ' + o.bonus_earned + ' ' + bonusWord(o.bonus_earned) + ' отменено');
+                meta.push('начисление ' + o.bonus_earned + ' ' + bonusRubWord(o.bonus_earned) + ' отменено');
               else
-                meta.push('начислено ' + o.bonus_earned + ' ' + bonusWord(o.bonus_earned));
+                meta.push('начислено ' + o.bonus_earned + ' ' + bonusRubWord(o.bonus_earned));
             }
             if (o.bonus_spent > 0) {
               if (o.bonus_spend_reversed_at)
-                meta.push('списание ' + o.bonus_spent + ' ' + bonusWord(o.bonus_spent) + ' отменено');
+                meta.push('списание ' + o.bonus_spent + ' ' + bonusRubWord(o.bonus_spent) + ' отменено');
               else
-                meta.push('списано ' + o.bonus_spent + ' ' + bonusWord(o.bonus_spent));
+                meta.push('списано ' + o.bonus_spent + ' ' + bonusRubWord(o.bonus_spent));
             }
             if (o.bonus_card_created) meta.push('карта создана');
             // items list
@@ -660,16 +837,90 @@
           });
         }
 
-        document.getElementById('form-section').style.display   = 'none';
-        document.getElementById('result-section').style.display = '';
+      }
+
+      // Fetches /api/bonus-card/details using runtime phone+pin.
+      // silent=true: only updates already-shown data on success; no UI changes;
+      //              swallows network errors; on 401/403 stops polling + resets form.
+      // silent=false: manages button/pin state and shows form errors.
+      function loadCardDetails(opts) {
+        var silent = !!(opts && opts.silent);
+        fetch('/api/bonus-card/details', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: currentCardPhone, pin: currentCardPin })
+        })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); })
+          .then(function (res) {
+            if (res.status === 401 || res.status === 403) {
+              stopPolling();
+              if (silent) {
+                resetToForm();
+                showError('Код карты стал недействительным. Войдите снова.');
+              } else {
+                currentCardPhone = null;
+                currentCardPin   = null;
+                document.getElementById('inp-pin').value = '';
+                var btn = document.getElementById('submit-btn');
+                btn.disabled    = false;
+                btn.textContent = 'Показать карту';
+                showError('Телефон или код карты не подошли. Проверьте данные или уточните код у продавца.');
+              }
+              return;
+            }
+            if (!silent) {
+              document.getElementById('inp-pin').value = '';
+              var btn = document.getElementById('submit-btn');
+              btn.disabled    = false;
+              btn.textContent = 'Показать карту';
+            }
+            if (!res.ok || !res.data.ok) {
+              if (!silent) {
+                currentCardPhone = null;
+                currentCardPin   = null;
+                showError('Телефон или код карты не подошли. Проверьте данные или уточните код у продавца.');
+              }
+              return;
+            }
+            renderCardData(res.data);
+            if (!silent) {
+              document.getElementById('form-section').style.display   = 'none';
+              document.getElementById('result-section').style.display = '';
+              startPolling();
+            }
+          })
+          .catch(function () {
+            if (!silent) {
+              currentCardPhone = null;
+              currentCardPin   = null;
+              document.getElementById('inp-pin').value = '';
+              var btn = document.getElementById('submit-btn');
+              btn.disabled    = false;
+              btn.textContent = 'Показать карту';
+              showError('Не удалось подключиться. Проверьте интернет и попробуйте снова.');
+            }
+          });
       }
 
       function resetToForm() {
+        stopPolling();
+        currentCardPhone = null;
+        currentCardPin   = null;
         document.getElementById('result-section').style.display = 'none';
         document.getElementById('form-section').style.display   = '';
         document.getElementById('inp-pin').value = '';
         hideError();
       }
+
+      // Silent refresh when tab becomes visible and result is already open
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible' &&
+            currentCardPhone &&
+            currentCardPin &&
+            document.getElementById('result-section').style.display !== 'none') {
+          loadCardDetails({ silent: true });
+        }
+      });
 
       document.getElementById('result-back-btn').addEventListener('click', resetToForm);
 
@@ -677,41 +928,22 @@
       document.getElementById('bonus-form').addEventListener('submit', function (e) {
         e.preventDefault();
         hideError();
+        stopPolling();
 
         var phoneVal = (document.getElementById('inp-phone').value || '').trim();
-        var pinEl    = document.getElementById('inp-pin');
-        var pinVal   = (pinEl.value || '').trim();
+        var pinVal   = (document.getElementById('inp-pin').value || '').trim();
 
         if (!phoneVal) { showError('Введите номер телефона.'); return; }
         if (!pinVal)   { showError('Введите код карты.'); return; }
+
+        currentCardPhone = phoneVal;
+        currentCardPin   = pinVal;
 
         var btn = document.getElementById('submit-btn');
         btn.disabled    = true;
         btn.textContent = 'Загружаем…';
 
-        fetch('/api/bonus-card/details', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: phoneVal, pin: pinVal })
-        })
-          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
-          .then(function (res) {
-            pinEl.value = '';           // clear PIN regardless of outcome
-            btn.disabled    = false;
-            btn.textContent = 'Показать бонусы';
-
-            if (!res.ok || !res.data.ok) {
-              showError('Телефон или код карты не подошли. Проверьте данные или уточните код у продавца.');
-              return;
-            }
-            showResult(res.data);
-          })
-          .catch(function () {
-            pinEl.value = '';
-            btn.disabled    = false;
-            btn.textContent = 'Показать бонусы';
-            showError('Не удалось подключиться. Проверьте интернет и попробуйте снова.');
-          });
+        loadCardDetails({ silent: false });
       });
     }());
   </script>
