@@ -413,7 +413,9 @@ const [liveStatus, setLiveStatus] = useState<string | null>(null);
 const [copied, setCopied] = useState<string | null>(null);
 const [pinState, setPinState] = useState<"idle" | "loading" | "shown" | "already_set" | "unavailable">("idle");
 const [pinValue, setPinValue] = useState<string | null>(null);
-const [orderToken, setOrderToken] = useState<string | null>(null);
+const [orderToken, setOrderToken] = useState<string | null>(
+  () => new URLSearchParams(window.location.search).get('token')
+);
 const [orderBonusUsed, setOrderBonusUsed] = useState<boolean>(false);
 const [orderBonusEarned, setOrderBonusEarned] = useState<number>(0);
 const [orderTotalRub, setOrderTotalRub] = useState<number | null>(null);
@@ -602,15 +604,25 @@ const isScheduledTimeInFuture =
 
 
   useEffect(() => {
-    if (!orderSent) return;
+    if (!orderSent && !orderToken) return;
     let intervalId: ReturnType<typeof setInterval>;
     const poll = () => {
-      fetch(`${API_BASE}/api/orders/${orderSent}`)
+      const url = orderToken
+        ? `${API_BASE}/api/order-status/${orderToken}`
+        : `${API_BASE}/api/orders/${orderSent}`;
+      fetch(url)
         .then(r => { if (!r.ok) throw r.status; return r.json(); })
         .then(data => {
           if (!data?.status) return;
           setLiveStatus(data.status);
-          setOrderToken(data.public_status_token ?? null);
+          // legacy endpoint returns public_status_token — upgrade URL to ?token
+          if (data.public_status_token && !orderToken) {
+            setOrderToken(data.public_status_token);
+            const _u = new URL(window.location.href);
+            _u.searchParams.delete('order');
+            _u.searchParams.set('token', data.public_status_token);
+            window.history.replaceState(null, '', _u.toString());
+          }
           setOrderBonusUsed(Boolean(data.bonus_used));
           setOrderBonusEarned(data.bonus_earned ?? 0);
           setOrderTotalRub(data.total_rub ?? null);
@@ -626,7 +638,7 @@ const isScheduledTimeInFuture =
     poll();
     intervalId = setInterval(poll, 12000);
     return () => clearInterval(intervalId);
-  }, [orderSent, API_BASE]);
+  }, [orderSent, orderToken, API_BASE]);
 
   useEffect(() => {
     if (result && !result.ok) {
@@ -869,11 +881,18 @@ const isScheduledTimeInFuture =
       } else {
         const oid = data.order_id ?? "—";
 const status = (data.status ?? "NEW") as "NEW" | "PENDING_CONFIRMATION";
+const tok = data.public_status_token ?? null;
 setOrderSent(oid);
 setOrderStatus(status);
 setLiveStatus(status);
+setOrderToken(tok);
 const _u = new URL(window.location.href);
-_u.searchParams.set('order', oid);
+if (tok) {
+  _u.searchParams.delete('order');
+  _u.searchParams.set('token', tok);
+} else {
+  _u.searchParams.set('order', oid);
+}
 window.history.replaceState(null, '', _u.toString());
         try {
           localStorage.setItem('order_contact', JSON.stringify({ phone: normalizedPhone, address: address.trim() }));
@@ -1068,6 +1087,7 @@ window.history.replaceState(null, '', _u.toString());
           else applyLocalContact();
           const _u = new URL(window.location.href);
           _u.searchParams.delete('order');
+          _u.searchParams.delete('token');
           window.history.replaceState(null, '', _u.toString());
         }}
       >
