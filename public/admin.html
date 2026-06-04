@@ -10,7 +10,7 @@
     .cfg input { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; }
     .order { border: 1px solid #eee; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
     .order-meta { font-size: 13px; color: #666; margin-bottom: 6px; }
-    .btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .btns { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 8px; align-items: stretch; }
     button { padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer;
              background: #3390ec; color: #fff; font-size: 13px; }
     .error { color: #c0392b; margin: 8px 0; font-size: 14px; }
@@ -101,6 +101,7 @@
 
   <script>
     let refreshInterval = null;
+    const noteDrafts = {};  // несохранённые черновики заметок оператора по orderId
     let lastKnownId = null;
     let audioCtx = null;
     let openCategories = new Set();
@@ -140,6 +141,8 @@
       ONWAY:     '🚗 Выехал',
       DONE:      '✅ Доставлен',
     };
+    // Порядок кнопок в карточке: основной путь заказа сверху, вторичные (Новый/Отклонён) — внизу.
+    const STATUS_BUTTON_ORDER = ['ACCEPTED', 'COOKING', 'ONWAY', 'DONE', 'NEW', 'REJECTED'];
 
 
     function base() { return document.getElementById('apiBase').value.replace(/\/$/, ''); }
@@ -290,6 +293,26 @@
     }
 
     function render(orders) {
+      // Запомнить фокус/курсор активной заметки, чтобы вернуть после перерисовки DOM.
+      let focusedNote = null;
+      const ae = document.activeElement;
+      if (ae && ae.classList && ae.classList.contains('note-input')) {
+        focusedNote = {
+          orderId: ae.dataset.orderId,
+          start: ae.selectionStart,
+          end: ae.selectionEnd,
+        };
+      }
+      // Сохранить несохранённый ввод заметок перед перерисовкой DOM.
+      document.querySelectorAll('input.note-input').forEach(inp => {
+        const id = inp.dataset.orderId;
+        const serverVal = inp.dataset.serverNote ?? '';
+        if (inp.value !== serverVal) {
+          noteDrafts[id] = inp.value;   // оператор изменил поле → черновик
+        } else {
+          delete noteDrafts[id];        // совпадает с сервером → черновик не нужен
+        }
+      });
       document.getElementById('orders-section').style.display = '';
       document.getElementById('jump-nav').style.display = 'flex';
       const CLOSED_STATUSES = new Set(['DONE', 'REJECTED']);
@@ -311,18 +334,19 @@
           ${o.comment ? `<div style="font-size:13px;opacity:.7">${o.comment}</div>` : ''}
           ${(o.items || []).length ? `<div style="font-size:13px;margin-top:4px">Состав:<br>${o.items.map(i => { const mp = o.order_mode === 'mixed' && i.item_order_mode ? (i.item_order_mode === 'hot' ? '🔥 · ' : '❄️ · ') : ''; return `• ${mp}${i.name} — ${i.qty} ${i.unit || 'шт'} × ${Math.round(i.price_rub)}₽`; }).join('<br>')}</div>` : ''}
           <div class="btns">
-            ${Object.entries(LABELS).map(([s, l]) =>
-              `<button onclick="setStatus('${o.id}','${s}')" style="${s === o.status ? 'outline:2px solid #f0a830;font-weight:700' : 'opacity:.55'}">${l}</button>`
+            ${STATUS_BUTTON_ORDER.map(s =>
+              `<button onclick="setStatus('${o.id}','${s}')" style="${s === o.status ? 'outline:2px solid #f0a830;font-weight:700' : 'opacity:.6'}">${LABELS[s]}</button>`
             ).join('')}
           </div>
           ${bonusInfo(o)}
           ${bonusPinBtn(o)}
-          <div style="margin-top:8px;display:flex;gap:6px;align-items:center">
-            <input id="note-${o.id}" value="${esc(o.operator_note||'')}" placeholder="Заметка оператора"
-              style="flex:1;padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px">
+          <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+            <input id="note-${o.id}" class="note-input" data-order-id="${o.id}" data-server-note="${esc(o.operator_note||'')}"
+              value="${esc(noteDrafts[o.id] != null ? noteDrafts[o.id] : (o.operator_note||''))}" placeholder="Заметка оператора"
+              style="flex:1 1 180px;min-width:0;padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px">
             <button id="notebtn-${o.id}" onclick="saveNote('${o.id}','note-${o.id}','notebtn-${o.id}')"
-              style="padding:4px 10px;font-size:12px;background:#eee;color:#333;border:none;border-radius:6px;cursor:pointer;white-space:nowrap">
-              Сохранить заметку
+              style="flex:0 0 auto;padding:4px 12px;font-size:12px;background:#eee;color:#333;border:none;border-radius:6px;cursor:pointer;white-space:nowrap">
+              Сохранить
             </button>
           </div>
         </div>
@@ -336,6 +360,17 @@
       const closedDetails = document.getElementById('orders-closed-details');
       closedEl.innerHTML = closed.map(cardTpl).join('');
       closedDetails.style.display = closed.length ? '' : 'none';
+      // Вернуть фокус и курсор в пересозданный input заметки.
+      if (focusedNote) {
+        const next = document.getElementById(`note-${focusedNote.orderId}`);
+        if (next) {
+          next.focus();
+          const len = next.value.length;
+          const start = Math.min(typeof focusedNote.start === 'number' ? focusedNote.start : len, len);
+          const end = Math.min(typeof focusedNote.end === 'number' ? focusedNote.end : len, len);
+          try { next.setSelectionRange(start, end); } catch (e) {}
+        }
+      }
     }
 
     function fmtDate(iso) { const p = iso.split('-'); return `${p[2]}.${p[1]}.${p[0].slice(2)}`; }
@@ -357,7 +392,7 @@
     function bonusInfo(o) {
       var BONUS_MIN = 1500, BONUS_PCT = 5;
       var base = o.total_before_bonus != null ? o.total_before_bonus : (o.total_rub || 0);
-      var s = '<div style="font-size:12px;margin-top:6px;padding:6px 10px;background:#f0f4ff;border-radius:6px;line-height:1.6">';
+      var s = '<div style="font-size:12px;margin-top:6px;padding:8px 12px;background:#f0f4ff;border-radius:6px;line-height:1.7">';
       var e = '</div>';
       if (o.bonus_used) {
         var amount = o.bonus_spent || o.bonus_reserved || 0;
@@ -854,6 +889,9 @@
       }).catch(() => null);
       const btn = document.getElementById(btnId);
       if (r && r.ok && btn) {
+        delete noteDrafts[orderId];                              // показываем серверную версию дальше
+        const inp = document.getElementById(`note-${orderId}`);
+        if (inp) inp.dataset.serverNote = note;                  // синхронизируем базовое значение
         const orig = btn.textContent;
         btn.textContent = '✓ Сохранено';
         setTimeout(() => { btn.textContent = orig; }, 2000);
