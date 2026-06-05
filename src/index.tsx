@@ -934,6 +934,7 @@ window.history.replaceState(null, '', _u.toString());
         justifyContent: "center",
         minHeight: "80vh",
         padding: 24,
+        paddingBottom: "calc(24px + env(safe-area-inset-bottom, 0px))",
         textAlign: "center",
       }}
     >
@@ -987,8 +988,10 @@ window.history.replaceState(null, '', _u.toString());
         }
         // C: DONE, no redemption
         const earnedMsg = orderBonusEarned > 0 ? (
-          <div style={{ marginBottom: orderBonusPinCanBeIssued ? 8 : 0 }}>
-            🎁 За этот заказ начислено: <strong>{orderBonusEarned}</strong> бонусов.
+          <div style={{ textAlign: "center", width: "100%", lineHeight: 1.4 }}>
+            🎁 За этот заказ начислено:{" "}
+            <strong>{orderBonusEarned}</strong>{" "}
+            бонусов.
           </div>
         ) : null;
         const pinBlock = (orderBonusPinCanBeIssued || pinState === "shown") ? (
@@ -1003,17 +1006,35 @@ window.history.replaceState(null, '', _u.toString());
             )}
             {pinState === "shown" && pinValue && (
               <div>
-                <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 4 }}>Ваш PIN-код (сохраните):</div>
-                <div style={{ fontSize: 32, fontWeight: 700, letterSpacing: 8 }}>{pinValue}</div>
+                <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 6 }}>Ваш PIN-код (сохраните):</div>
+                <div style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  textAlign: "center",
+                  width: "fit-content",
+                  maxWidth: "100%",
+                  margin: "0 auto",
+                  background: "#fdf6ec",
+                  border: "1px solid #ecd9b8",
+                  borderRadius: 10,
+                  padding: "10px 18px",
+                  fontSize: 30,
+                  fontWeight: 700,
+                  letterSpacing: 6,
+                  fontVariantNumeric: "tabular-nums",
+                  color: "#3a2e28",
+                }}>{pinValue}</div>
+                <div style={{ fontSize: 12, opacity: 0.6, lineHeight: 1.45, maxWidth: 280, margin: "8px auto 0" }}>ⓘ Для раздела «Мои бонусы» и списания бонусов.</div>
               </div>
             )}
             {pinState === "already_set" && (
-              <div style={{ fontSize: 13, opacity: 0.7 }}>
-                Код уже был выдан ранее. Если потеряли — обратитесь к оператору.
+              <div style={{ fontSize: 13, opacity: 0.8, lineHeight: 1.5 }}>
+                PIN-код уже был выдан ранее. Если потеряли — обратитесь к оператору.
               </div>
             )}
             {pinState === "unavailable" && (
-              <div style={{ fontSize: 13, opacity: 0.7 }}>
+              <div style={{ fontSize: 13, opacity: 0.8, lineHeight: 1.5 }}>
                 Не удалось получить код карты. Попробуйте позже или обратитесь к оператору.
               </div>
             )}
@@ -1025,8 +1046,22 @@ window.history.replaceState(null, '', _u.toString());
         ) : null;
         if (!earnedMsg && !pinBlock) return null;
         return (
-          <div style={{ marginBottom: 16, padding: "12px 16px", background: "rgba(0,0,0,0.04)", borderRadius: 10, fontSize: 14, maxWidth: 320 }}>
+          <div style={{
+            padding: "18px 20px",
+            background: "#fff",
+            borderRadius: 14,
+            fontSize: 14,
+            boxSizing: "border-box",
+            width: "min(100%, 400px)",
+            maxWidth: "calc(100vw - 32px)",
+            margin: "0 auto 16px",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+            border: "1px solid rgba(0,0,0,0.05)",
+          }}>
             {earnedMsg}
+            {earnedMsg && pinBlock && (
+              <div style={{ height: 1, background: "rgba(0,0,0,0.08)", margin: "12px 0" }} />
+            )}
             {pinBlock}
           </div>
         );
