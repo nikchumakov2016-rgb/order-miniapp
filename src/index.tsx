@@ -2046,7 +2046,7 @@ window.history.replaceState(null, '', _u.toString());
                     );
                     return (
                       <div style={{ fontSize: 13, color: "#5a8a5a", margin: "4px 0 10px", lineHeight: 1.45 }}>
-                        🎁 За этот заказ начислим <strong>{Math.floor(cartTotal * BONUS_EARN_PERCENT / 100)}</strong> {bonusRubWord(Math.floor(cartTotal * BONUS_EARN_PERCENT / 100))}
+                        🎁 После доставки создадим бонусную карту и начислим <strong>{Math.floor(cartTotal * BONUS_EARN_PERCENT / 100)}</strong> {bonusRubWord(Math.floor(cartTotal * BONUS_EARN_PERCENT / 100))}
                       </div>
                     );
                   }
