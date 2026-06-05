@@ -337,6 +337,15 @@ const DISPLAY_CATEGORIES = [
 
 const HOT_LABELS: Record<string, string> = { shashlik: "Шашлык жареный" };
 
+function bonusRubWord(n: number): string {
+  const abs = Math.abs(n) % 100;
+  const m = abs % 10;
+  if (abs >= 11 && abs <= 19) return "бонусных рублей";
+  if (m === 1) return "бонусный рубль";
+  if (m >= 2 && m <= 4) return "бонусных рубля";
+  return "бонусных рублей";
+}
+
 function App() {
   const API_BASE = (import.meta as any).env?.VITE_API_BASE ?? "";
   const BONUS_MIN_ORDER_TOTAL = 1500;
@@ -959,15 +968,15 @@ window.history.replaceState(null, '', _u.toString());
         if (liveStatus === "REJECTED") {
           if (!orderBonusEarnReversedAt) return null;
           const msg = orderBonusCardCreated
-            ? "Заказ отменён. Начисленные бонусы отменены, бонусная карта, созданная по этому заказу, аннулирована."
-            : "Заказ отменён. Начисленные бонусы за этот заказ отменены.";
+            ? "Заказ отменён. Начисленные бонусные рубли отменены, бонусная карта, созданная по этому заказу, аннулирована."
+            : "Заказ отменён. Начисленные бонусные рубли за этот заказ отменены.";
           return <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 12 }}>{msg}</div>;
         }
         // A: bonus was used (redemption)
         if (orderBonusUsed) {
           const msg = liveStatus === "DONE"
-            ? "Бонусы списаны. Новые бонусы за этот заказ не начисляются."
-            : "Бонусы зарезервированы. Новые бонусы за этот заказ не начисляются.";
+            ? "Бонусные рубли списаны. Новые бонусные рубли за этот заказ не начисляются."
+            : "Бонусные рубли зарезервированы. Новые бонусные рубли за этот заказ не начисляются.";
           return (
             <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 12 }}>{msg}</div>
           );
@@ -980,8 +989,8 @@ window.history.replaceState(null, '', _u.toString());
           return (
             <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 12 }}>
               🎁 {orderBonusCustomerHasCard
-                ? <>После доставки будет начислено: <strong>{willEarn}</strong> бонусов.</>
-                : <>После доставки будет создана бонусная карта и начислено: <strong>{willEarn}</strong> бонусов.</>
+                ? <>После доставки будет начислено: <strong>{willEarn}</strong> {bonusRubWord(willEarn)}.</>
+                : <>После доставки будет создана бонусная карта и начислено: <strong>{willEarn}</strong> {bonusRubWord(willEarn)}.</>
               }
             </div>
           );
@@ -991,7 +1000,7 @@ window.history.replaceState(null, '', _u.toString());
           <div style={{ textAlign: "center", width: "100%", lineHeight: 1.4 }}>
             🎁 За этот заказ начислено:{" "}
             <strong>{orderBonusEarned}</strong>{" "}
-            бонусов.
+            {bonusRubWord(orderBonusEarned)}.
           </div>
         ) : null;
         const pinBlock = (orderBonusPinCanBeIssued || pinState === "shown") ? (
@@ -1025,7 +1034,7 @@ window.history.replaceState(null, '', _u.toString());
                   fontVariantNumeric: "tabular-nums",
                   color: "#3a2e28",
                 }}>{pinValue}</div>
-                <div style={{ fontSize: 12, opacity: 0.6, lineHeight: 1.45, maxWidth: 280, margin: "8px auto 0" }}>ⓘ Для раздела «Мои бонусы» и списания бонусов.</div>
+                <div style={{ fontSize: 12, opacity: 0.6, lineHeight: 1.45, maxWidth: 280, margin: "8px auto 0" }}>ⓘ Для раздела «Мои бонусы» и списания бонусных рублей.</div>
               </div>
             )}
             {pinState === "already_set" && (
@@ -2012,7 +2021,7 @@ window.history.replaceState(null, '', _u.toString());
                 <span>Итого</span>
                 <span>
                   {bonusUse > 0
-                    ? <>{totalAfterBonus}{currency} <span style={{ fontSize: 12, opacity: 0.6 }}>({cartTotal} − {bonusUse} бонусов)</span></>
+                    ? <>{totalAfterBonus}{currency} <span style={{ fontSize: 12, opacity: 0.6 }}>({cartTotal} − {bonusUse} {bonusRubWord(bonusUse)})</span></>
                     : <>{cartTotal}{currency}</>
                   }
                 </span>
@@ -2037,14 +2046,14 @@ window.history.replaceState(null, '', _u.toString());
                     );
                     return (
                       <div style={{ fontSize: 13, color: "#5a8a5a", margin: "4px 0 10px", lineHeight: 1.45 }}>
-                        🎁 За этот заказ начислим <strong>{Math.floor(cartTotal * BONUS_EARN_PERCENT / 100)}</strong> бонусов
+                        🎁 За этот заказ начислим <strong>{Math.floor(cartTotal * BONUS_EARN_PERCENT / 100)}</strong> {bonusRubWord(Math.floor(cartTotal * BONUS_EARN_PERCENT / 100))}
                       </div>
                     );
                   }
                   return (
                     <div style={{ margin: "6px 0 10px", padding: "10px 12px", background: tgVar("secondary-bg-color", "#f5f0eb"), borderRadius: 10, fontSize: 13 }}>
                       <div style={{ marginBottom: 6 }}>
-                        💳 Доступно: <strong>{bonusCard.available_balance}</strong> бонусов
+                        💳 Доступно: <strong>{bonusCard.available_balance}</strong> {bonusRubWord(bonusCard.available_balance)}
                       </div>
                       {maxBonus > 0 ? (
                         <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 6 }}>
@@ -2053,10 +2062,10 @@ window.history.replaceState(null, '', _u.toString());
                             checked={useBonusChecked}
                             onChange={e => { setUseBonusChecked(e.target.checked); setBonusPin(""); }}
                           />
-                          Списать {maxBonus} бонусов (максимум {BONUS_MAX_REDEEM_PERCENT}% заказа)
+                          Списать {maxBonus} {bonusRubWord(maxBonus)} (максимум {BONUS_MAX_REDEEM_PERCENT}% заказа)
                         </label>
                       ) : bonusCard.available_balance <= 0 ? (
-                        <div style={{ opacity: 0.6 }}>На карте пока нет бонусов для списания.</div>
+                        <div style={{ opacity: 0.6 }}>На карте пока нет бонусных рублей для списания.</div>
                       ) : (
                         <div style={{ opacity: 0.6 }}>Списание недоступно для этой суммы заказа.</div>
                       )}
@@ -2072,12 +2081,12 @@ window.history.replaceState(null, '', _u.toString());
                             maxLength={BONUS_PIN_LENGTH}
                           />
                           <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>
-                            Новые бонусы за этот заказ не начисляются, потому что используются бонусы
+                            При списании бонусных рублей новых начислений за этот заказ не будет.
                           </div>
                         </>
                       ) : (
                         <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>
-                          За этот заказ будет начислено: {Math.floor(cartTotal * BONUS_EARN_PERCENT / 100)} бонусов
+                          За этот заказ будет начислено: {Math.floor(cartTotal * BONUS_EARN_PERCENT / 100)} {bonusRubWord(Math.floor(cartTotal * BONUS_EARN_PERCENT / 100))}
                         </div>
                       )}
                     </div>
