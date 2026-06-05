@@ -382,6 +382,15 @@
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
+    function bonusRubWord(n) {
+      var abs = Math.abs(n) % 100;
+      var m = abs % 10;
+      if (abs >= 11 && abs <= 19) return 'бонусных рублей';
+      if (m === 1) return 'бонусный рубль';
+      if (m >= 2 && m <= 4) return 'бонусных рубля';
+      return 'бонусных рублей';
+    }
+
     function issuedPinHtml(pin) {
       return '<div style="margin-top:6px;padding:6px 10px;background:#e8f5e9;border-radius:6px;font-size:13px">'
         + '💳 Код карты клиента: <b style="font-size:18px;letter-spacing:5px">' + pin + '</b>'
@@ -398,27 +407,27 @@
         var amount = o.bonus_spent || o.bonus_reserved || 0;
         var statusLine;
         if (o.bonus_released_at) {
-          statusLine = '💳 Бонусы возвращены: ' + amount + ' бонусов (заказ отменён)';
+          statusLine = '💳 Бонусные рубли возвращены: ' + amount + ' ' + bonusRubWord(amount) + ' (заказ отменён)';
         } else if (o.bonus_spent_at) {
-          statusLine = '💳 Списано: ' + amount + ' бонусов';
+          statusLine = '💳 Списано: ' + amount + ' ' + bonusRubWord(amount);
         } else {
-          statusLine = '💳 Клиент хочет списать: ' + amount + ' бонусов (зарезервировано)';
+          statusLine = '💳 Клиент хочет списать: ' + amount + ' ' + bonusRubWord(amount) + ' (зарезервировано)';
         }
         var breakdown = (o.total_before_bonus != null && o.total_rub != null && amount > 0)
           ? '<br><span style="opacity:.7">Сумма до списания: ' + o.total_before_bonus + ' ₽ · Скидка: −' + amount + ' ₽ · К оплате: ' + o.total_rub + ' ₽</span>'
           : '';
-        return s + statusLine + breakdown + '<br><span style="opacity:.6">Новые бонусы за этот заказ не начисляются</span>' + e;
+        return s + statusLine + breakdown + '<br><span style="opacity:.6">При списании бонусных рублей новых начислений за этот заказ не будет.</span>' + e;
       }
       if (o.bonus_earn_reversed_at) {
         var reversedLabel = o.bonus_card_created
           ? '🎁 Начисление отменено. Бонусная карта, созданная этим заказом, аннулирована.'
-          : '🎁 Начисление отменено: ' + (o.bonus_earned || 0) + ' бонусов';
+          : '🎁 Начисление отменено: ' + (o.bonus_earned || 0) + ' ' + bonusRubWord(o.bonus_earned || 0);
         return s + reversedLabel + e;
       }
       if (o.bonus_earned_at) {
         var earnLabel = o.bonus_card_created
-          ? '🎁 Бонусная карта создана. Начислено: ' + o.bonus_earned + ' бонусов'
-          : '🎁 Начислено: ' + o.bonus_earned + ' бонусов';
+          ? '🎁 Бонусная карта создана. Начислено: ' + o.bonus_earned + ' ' + bonusRubWord(o.bonus_earned)
+          : '🎁 Начислено: ' + o.bonus_earned + ' ' + bonusRubWord(o.bonus_earned);
         return s + earnLabel + e;
       }
       if (base < BONUS_MIN && !o.bonus_customer_has_card) return '';
@@ -426,12 +435,12 @@
         var willEarn = Math.floor(base * BONUS_PCT / 100);
         if (willEarn <= 0) return '';
         var msg = o.bonus_customer_has_card
-          ? '🎁 Будет начислено при выполнении заказа: ' + willEarn + ' бонусов'
-          : '🎁 При доставке будет создана бонусная карта и начислено: ' + willEarn + ' бонусов';
+          ? '🎁 Будет начислено при выполнении заказа: ' + willEarn + ' ' + bonusRubWord(willEarn)
+          : '🎁 При доставке будет создана бонусная карта и начислено: ' + willEarn + ' ' + bonusRubWord(willEarn);
         return s + msg + e;
       }
       if (o.bonus_card_id) {
-        return s + '🎁 Бонусы ожидают начисления' + e;
+        return s + '🎁 Бонусные рубли ожидают начисления' + e;
       }
       return '';
     }
@@ -586,7 +595,7 @@
         break;
       }
       var sign = delta > 0 ? '+' : '';
-      if (!confirm('Применить корректировку ' + sign + delta + ' бонусов для карты ' + phone + '?')) return;
+      if (!confirm('Применить корректировку ' + sign + delta + ' ' + bonusRubWord(delta) + ' для карты ' + phone + '?')) return;
       var tk = sanitizeToken(tok());
       if (tk.error) { showError(tk.error); return; }
       var r = await fetch(base() + '/api/admin/bonus-cards/' + cardId + '/adjust', {
@@ -596,7 +605,7 @@
       }).catch(function() { return null; });
       if (!r) { showError('Ошибка сети'); return; }
       var data = await r.json().catch(function() { return null; });
-      if (!r.ok) { alert((data && data.detail) || 'Ошибка корректировки бонусов'); return; }
+      if (!r.ok) { alert((data && data.detail) || 'Ошибка корректировки бонусных рублей'); return; }
       var txWasOpen = window.adminOpenTx && window.adminOpenTx[cardId];
       if (window.adminTxCache) delete window.adminTxCache[cardId];
       if (window.adminTxCacheMode) delete window.adminTxCacheMode[cardId];
