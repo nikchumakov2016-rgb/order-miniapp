@@ -223,7 +223,10 @@
         .then(catalog => {
           if (catalog) {
             clearStockError();
-            renderStock(catalog.categories || []);
+            renderStock([
+              ...(catalog.categories || []),
+              ...(catalog.hot_categories || []),
+            ]);
             renderEditor(catalog.categories || [], catalog.hot_categories || []);
             document.getElementById('editor-details').style.display = '';
           }
@@ -919,6 +922,47 @@
     function showEditorError(msg) { document.getElementById('editor-error').textContent = msg; }
     function clearEditorError()   { document.getElementById('editor-error').textContent = ''; }
 
+    function niCatOptions(section) {
+      const cats = section === 'hot_categories' ? hotEditorCatalog : editorCatalog;
+      return (cats || []).map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+    }
+
+    function renderAddItemForm() {
+      if (!editorCatalog.length && !hotEditorCatalog.length) return '';
+      const fieldStyle = 'width:100%;margin-top:2px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;box-sizing:border-box';
+      return `
+        <div style="margin-bottom:14px;padding:12px 14px;border:1px solid #cfe3d0;border-radius:10px;background:#f3faf3">
+          <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2e7d32">➕ Новый товар</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+            <label style="font-size:12px;opacity:.6">Раздел
+              <select id="ni-section" onchange="onAddSectionChange()" style="${fieldStyle}">
+                <option value="categories">Заморозка</option>
+                <option value="hot_categories">Готовое меню</option>
+              </select>
+            </label>
+            <label style="font-size:12px;opacity:.6">Категория
+              <select id="ni-cat" style="${fieldStyle}">${niCatOptions('categories')}</select>
+            </label>
+            <label style="font-size:12px;opacity:.6">Название*
+              <input id="ni-name" style="${fieldStyle}">
+            </label>
+            <label style="font-size:12px;opacity:.6">Цена, ₽*
+              <input id="ni-price" type="number" step="1" min="0" style="${fieldStyle}">
+            </label>
+            <label style="font-size:12px;opacity:.6">Единица
+              <input id="ni-unit" value="шт" style="${fieldStyle}">
+            </label>
+            <label style="font-size:12px;opacity:.6;grid-column:1 / -1">Описание (необязательно)
+              <input id="ni-subtitle" style="${fieldStyle}">
+            </label>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button id="ni-submit" onclick="createItem()" style="padding:7px 18px;border:none;border-radius:6px;background:#2e7d32;color:#fff;font-size:13px;cursor:pointer">Добавить товар</button>
+            <span id="ni-msg" style="font-size:12px;opacity:.7"></span>
+          </div>
+        </div>`;
+    }
+
     function renderEditor(categories, hotCategories) {
       if (editorLoadedOnce) return;
       editorLoadedOnce = true;
@@ -934,9 +978,68 @@
         </div>
       `).join('');
       el.innerHTML =
+        renderAddItemForm() +
         renderActivePromosPanel() +
         (hotEditorCatalog.length ? `<div style="font-size:13px;font-weight:700;margin:10px 0 8px;padding:8px 10px;background:#fff3e0;border-radius:8px;color:#b94a00">🔥 Готовое меню — цены на витрине «Горячее»</div>` + renderSection(hotEditorCatalog, true) : '') +
         (categories.length ? `<div style="font-size:13px;font-weight:700;margin:18px 0 8px;padding:8px 10px;background:#e8f4ff;border-radius:8px;color:#1a5fa8">❄️ Заморозка</div>` + renderSection(categories, false) : '');
+    }
+
+    function onAddSectionChange() {
+      const section = document.getElementById('ni-section')?.value || 'categories';
+      const catSel = document.getElementById('ni-cat');
+      if (catSel) catSel.innerHTML = niCatOptions(section);
+      const msg = document.getElementById('ni-msg');
+      if (msg) msg.textContent = '';
+    }
+
+    async function createItem() {
+      const msgEl = document.getElementById('ni-msg');
+      const setMsg = (t, err) => { if (msgEl) { msgEl.textContent = t; msgEl.style.cssText = err ? 'font-size:12px;color:#b91c1c' : 'font-size:12px;opacity:.7'; } };
+      const { value: token, error: tokenError } = sanitizeToken(tok());
+      if (tokenError) { setMsg(tokenError, true); return; }
+      const section     = document.getElementById('ni-section')?.value || 'categories';
+      const category_id = document.getElementById('ni-cat')?.value || '';
+      const name        = (document.getElementById('ni-name')?.value || '').trim();
+      const unit        = (document.getElementById('ni-unit')?.value || '').trim();
+      const subtitle    = (document.getElementById('ni-subtitle')?.value || '').trim();
+      const priceRaw    = (document.getElementById('ni-price')?.value || '').trim();
+      if (!category_id) { setMsg('Выберите категорию.', true); return; }
+      if (!name)        { setMsg('Укажите название.', true); return; }
+      if (!unit)        { setMsg('Укажите единицу.', true); return; }
+      if (priceRaw === '') { setMsg('Укажите цену.', true); return; }
+      const price = Number(priceRaw);
+      if (!Number.isInteger(price) || price < 0) { setMsg('Цена — целое число не меньше 0.', true); return; }
+      const btn = document.getElementById('ni-submit');
+      if (btn) btn.disabled = true;
+      setMsg('Добавляю…');
+      try {
+        const r = await fetch(`${base()}/api/admin/catalog/items`, {
+          method: 'POST',
+          headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category_id, section, name, price, unit, subtitle }),
+        }).catch(() => null);
+        if (!r) { setMsg('Не удалось подключиться.', true); return; }
+        if (!r.ok) { setMsg(await parseError(r), true); return; }
+        let loaded = false;
+        try {
+          loaded = await reloadEditorCatalogFromServer();
+        } catch {
+          loaded = false;
+        }
+        if (!loaded) {
+          setMsg('Товар добавлен, но список не обновился — обновите страницу.', true);
+          return;
+        }
+        editorLoadedOnce = false;
+        renderEditor(editorCatalog, hotEditorCatalog);
+        const sectionSel = document.getElementById('ni-section');
+        if (sectionSel) { sectionSel.value = section; onAddSectionChange(); }
+        const freshMsg = document.getElementById('ni-msg');
+        if (freshMsg) { freshMsg.textContent = '✓ Товар добавлен'; freshMsg.style.cssText = 'font-size:12px;opacity:.7'; }
+      } finally {
+        const b = document.getElementById('ni-submit');
+        if (b) b.disabled = false;
+      }
     }
 
     function renderItemRow(item, idx, cat, isHot) {
