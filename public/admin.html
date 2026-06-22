@@ -147,6 +147,9 @@
 
     function base() { return document.getElementById('apiBase').value.replace(/\/$/, ''); }
     function tok()  { return document.getElementById('token').value; }
+    // Заголовок для полного admin-каталога (включая hidden): используется во всех
+    // административных товарных списках (редактор, стоп-лист, reorder, reload).
+    function adminHeaders() { return { 'X-Admin-Token': sanitizeToken(tok()).value }; }
     function showError(msg) { document.getElementById('error').textContent = msg; errorTimestamp = Date.now(); }
 
     function sanitizeToken(raw) {
@@ -218,7 +221,7 @@
       if (lastKnownId !== null && newId !== null && newId !== lastKnownId && !Boolean(newOrder?.is_test)) beep();
       lastKnownId = newId ?? lastKnownId;
       render(orders);
-      fetch(`${base()}/api/catalog`, { cache: 'no-store' })
+      fetch(`${base()}/api/admin/catalog`, { headers: { 'X-Admin-Token': token }, cache: 'no-store' })
         .then(rc => rc.ok ? rc.json() : null)
         .then(catalog => {
           if (catalog) {
@@ -845,7 +848,7 @@
         const isOpen = openCategories.has(catKey);
         const rows = items.map(item => `
           <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0">
-            <span style="font-size:14px">${item.in_stock !== false ? '✅' : '❌'} ${item.name}</span>
+            <span style="font-size:14px">${item.in_stock !== false ? '✅' : '❌'} ${item.name}${item.hidden ? ' <span style="font-size:11px;font-weight:600;color:#b94a00;background:#fff3e0;border-radius:4px;padding:1px 6px">Скрыт с витрины</span>' : ''}</span>
             <button onclick="setStock('${catKey}','${item.id}',${item.in_stock !== false ? 'false' : 'true'})"
                     style="font-size:12px;padding:4px 10px">
               ${item.in_stock !== false ? 'Снять' : 'Вернуть'}
@@ -955,6 +958,9 @@
             <label style="font-size:12px;opacity:.6;grid-column:1 / -1">Описание (необязательно)
               <input id="ni-subtitle" style="${fieldStyle}">
             </label>
+            <label style="font-size:12px;opacity:.6;grid-column:1 / -1">Фото (необязательно)
+              <input id="ni-photo" type="file" accept="image/*" style="${fieldStyle}">
+            </label>
           </div>
           <div style="display:flex;gap:8px;align-items:center">
             <button id="ni-submit" onclick="createItem()" style="padding:7px 18px;border:none;border-radius:6px;background:#2e7d32;color:#fff;font-size:13px;cursor:pointer">Добавить товар</button>
@@ -963,13 +969,149 @@
         </div>`;
     }
 
+    function renderCategoryManager(section) {
+      const cats = section === 'hot_categories' ? hotEditorCatalog : editorCatalog;
+      const fs = 'padding:4px 7px;border:1px solid #ddd;border-radius:6px;font-size:13px;box-sizing:border-box';
+      const rows = (cats || []).map((cat, idx) => {
+        const count = (cat.items || []).length;
+        const cid = esc(cat.id);
+        const delDisabled = count > 0;
+        return `
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:5px 0;border-bottom:1px solid #f0ebe0">
+            <input id="catemoji-${cid}" value="${esc(cat.emoji || '')}" placeholder="emoji" style="${fs};width:64px">
+            <input id="catname-${cid}" value="${esc(cat.name || '')}" placeholder="Название" style="${fs};flex:1;min-width:120px">
+            <span style="font-size:11px;opacity:.5">товаров: ${count}</span>
+            <button onclick="moveCategory('${esc(section)}','${cid}',-1)" style="${fs};cursor:pointer"${idx === 0 ? ' disabled' : ''}>↑</button>
+            <button onclick="moveCategory('${esc(section)}','${cid}',1)" style="${fs};cursor:pointer"${idx === (cats.length - 1) ? ' disabled' : ''}>↓</button>
+            <button onclick="saveCategory('${cid}')" style="${fs};background:#3390ec;color:#fff;border:none;cursor:pointer">Сохранить</button>
+            <button onclick="deleteCategory('${cid}')" style="${fs};background:#c0392b;color:#fff;border:none;${delDisabled ? 'opacity:.4;cursor:not-allowed' : 'cursor:pointer'}"${delDisabled ? ' disabled title="Сначала перенесите или удалите товары"' : ''}>Удалить</button>
+          </div>`;
+      }).join('');
+      return `
+        <div style="margin:6px 0 12px;padding:8px 10px;border:1px solid #e2ddd6;border-radius:8px;background:#faf8f5">
+          <div style="font-size:11px;font-weight:700;opacity:.55;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Категории раздела</div>
+          ${rows}
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px">
+            <input id="catnew-emoji-${esc(section)}" placeholder="emoji" style="${fs};width:64px">
+            <input id="catnew-name-${esc(section)}" placeholder="Новая категория" style="${fs};flex:1;min-width:120px">
+            <button onclick="createCategory('${esc(section)}')" style="${fs};background:#2e7d32;color:#fff;border:none;cursor:pointer">+ Категория</button>
+            <span id="catmgr-msg-${esc(section)}" style="font-size:12px;opacity:.7"></span>
+          </div>
+        </div>`;
+    }
+
+    function catMgrMsg(section, text, isError) {
+      const el = document.getElementById(`catmgr-msg-${section}`);
+      if (el) { el.textContent = text; el.style.cssText = isError ? 'font-size:12px;color:#b91c1c' : 'font-size:12px;opacity:.7'; }
+    }
+
+    function catSectionOf(catId) {
+      for (const c of editorCatalog) if (c.id === catId) return 'categories';
+      for (const c of hotEditorCatalog) if (c.id === catId) return 'hot_categories';
+      return null;
+    }
+
+    async function finishCategoryOp(section, okMsg, partialMsg) {
+      // сохранить раздел формы создания до полной перерисовки
+      const prevSection = document.getElementById('ni-section')?.value ?? null;
+      let loaded = false;
+      try { loaded = await reloadEditorCatalogFromServer(); } catch { loaded = false; }
+      if (!loaded) { catMgrMsg(section, partialMsg, true); return; }
+      editorLoadedOnce = false;
+      renderEditor(editorCatalog, hotEditorCatalog);
+      renderStock([...editorCatalog, ...hotEditorCatalog]);
+      const sectionSel = document.getElementById('ni-section');
+      if (sectionSel) {
+        sectionSel.value = prevSection !== null ? prevSection : section;
+        onAddSectionChange();
+      }
+      catMgrMsg(section, okMsg, false); // элемент пересоздан перерисовкой — пишем в свежий
+    }
+
+    async function createCategory(section) {
+      if (hasAnyDirtyItems()) { catMgrMsg(section, 'Сначала сохраните или сбросьте изменения товаров', true); return; }
+      const { value: token, error: tokenError } = sanitizeToken(tok());
+      if (tokenError) { catMgrMsg(section, tokenError, true); return; }
+      const name  = (document.getElementById(`catnew-name-${section}`)?.value || '').trim();
+      const emoji = (document.getElementById(`catnew-emoji-${section}`)?.value || '').trim();
+      if (!name) { catMgrMsg(section, 'Укажите название', true); return; }
+      const r = await fetch(`${base()}/api/admin/catalog/categories`, {
+        method: 'POST',
+        headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ section, name, emoji }),
+      }).catch(() => null);
+      if (!r) { catMgrMsg(section, 'Не удалось подключиться.', true); return; }
+      if (!r.ok) { catMgrMsg(section, await parseError(r), true); return; }
+      await finishCategoryOp(section, '✓ Категория создана', 'Категория создана, но список не обновился — обновите страницу');
+    }
+
+    async function saveCategory(catId) {
+      const section = catSectionOf(catId);
+      if (section === null) return;
+      if (hasAnyDirtyItems()) { catMgrMsg(section, 'Сначала сохраните или сбросьте изменения товаров', true); return; }
+      const { value: token, error: tokenError } = sanitizeToken(tok());
+      if (tokenError) { catMgrMsg(section, tokenError, true); return; }
+      const name  = (document.getElementById(`catname-${catId}`)?.value || '').trim();
+      const emoji = (document.getElementById(`catemoji-${catId}`)?.value || '').trim();
+      if (!name) { catMgrMsg(section, 'Укажите название', true); return; }
+      const r = await fetch(`${base()}/api/admin/catalog/categories/${catId}`, {
+        method: 'PATCH',
+        headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, emoji }),
+      }).catch(() => null);
+      if (!r) { catMgrMsg(section, 'Не удалось подключиться.', true); return; }
+      if (!r.ok) { catMgrMsg(section, await parseError(r), true); return; }
+      await finishCategoryOp(section, '✓ Категория изменена', 'Категория изменена, но список не обновился — обновите страницу');
+    }
+
+    async function moveCategory(section, catId, dir) {
+      if (hasAnyDirtyItems()) { catMgrMsg(section, 'Сначала сохраните или сбросьте изменения товаров', true); return; }
+      const cats = section === 'hot_categories' ? hotEditorCatalog : editorCatalog;
+      const ids = (cats || []).map(c => c.id);
+      const idx = ids.indexOf(catId);
+      if (idx < 0) return;
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= ids.length) return; // граница — ничего не отправляем
+      [ids[idx], ids[newIdx]] = [ids[newIdx], ids[idx]];
+      const { value: token, error: tokenError } = sanitizeToken(tok());
+      if (tokenError) { catMgrMsg(section, tokenError, true); return; }
+      const r = await fetch(`${base()}/api/admin/catalog/categories/reorder`, {
+        method: 'POST',
+        headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ section, category_ids: ids }),
+      }).catch(() => null);
+      if (!r) { catMgrMsg(section, 'Не удалось подключиться.', true); return; }
+      if (!r.ok) { catMgrMsg(section, await parseError(r), true); return; }
+      await finishCategoryOp(section, '✓ Порядок изменён', 'Порядок изменён, но список не обновился — обновите страницу');
+    }
+
+    async function deleteCategory(catId) {
+      const section = catSectionOf(catId);
+      if (section === null) return;
+      const cats = section === 'hot_categories' ? hotEditorCatalog : editorCatalog;
+      const cat = cats.find(c => c.id === catId);
+      if (!cat) return;
+      if (hasAnyDirtyItems()) { catMgrMsg(section, 'Сначала сохраните или сбросьте изменения товаров', true); return; }
+      if ((cat.items || []).length > 0) { catMgrMsg(section, 'Категория не пуста — сначала перенесите или удалите товары', true); return; }
+      const name = cat.name || catId;
+      if (!confirm(`Удалить категорию «${name}»? Удаление возможно только если она пустая.`)) return;
+      const { value: token, error: tokenError } = sanitizeToken(tok());
+      if (tokenError) { catMgrMsg(section, tokenError, true); return; }
+      const r = await fetch(`${base()}/api/admin/catalog/categories/${catId}`, {
+        method: 'DELETE',
+        headers: { 'X-Admin-Token': token },
+      }).catch(() => null);
+      if (!r) { catMgrMsg(section, 'Не удалось подключиться.', true); return; }
+      if (!r.ok) { catMgrMsg(section, await parseError(r), true); return; }
+      await finishCategoryOp(section, '✓ Категория удалена', 'Категория удалена, но список не обновился — обновите страницу');
+    }
+
     function renderEditor(categories, hotCategories) {
       if (editorLoadedOnce) return;
       editorLoadedOnce = true;
       editorCatalog = categories;
       hotEditorCatalog = hotCategories || [];
       const el = document.getElementById('editor');
-      if (!categories.length && !hotEditorCatalog.length) { el.innerHTML = ''; return; }
       const renderSection = (cats, isHot) => cats.map(cat => `
         <div style="margin-bottom:16px">
           <div style="font-size:14px;font-weight:600;margin:10px 0 6px;opacity:.7">${cat.emoji || ''} ${esc(cat.name)}</div>
@@ -980,8 +1122,12 @@
       el.innerHTML =
         renderAddItemForm() +
         renderActivePromosPanel() +
-        (hotEditorCatalog.length ? `<div style="font-size:13px;font-weight:700;margin:10px 0 8px;padding:8px 10px;background:#fff3e0;border-radius:8px;color:#b94a00">🔥 Готовое меню — цены на витрине «Горячее»</div>` + renderSection(hotEditorCatalog, true) : '') +
-        (categories.length ? `<div style="font-size:13px;font-weight:700;margin:18px 0 8px;padding:8px 10px;background:#e8f4ff;border-radius:8px;color:#1a5fa8">❄️ Заморозка</div>` + renderSection(categories, false) : '');
+        `<div style="font-size:13px;font-weight:700;margin:10px 0 8px;padding:8px 10px;background:#fff3e0;border-radius:8px;color:#b94a00">🔥 Готовое меню — цены на витрине «Горячее»</div>` +
+        renderCategoryManager('hot_categories') +
+        (hotEditorCatalog.length ? renderSection(hotEditorCatalog, true) : '') +
+        `<div style="font-size:13px;font-weight:700;margin:18px 0 8px;padding:8px 10px;background:#e8f4ff;border-radius:8px;color:#1a5fa8">❄️ Заморозка</div>` +
+        renderCategoryManager('categories') +
+        (categories.length ? renderSection(categories, false) : '');
     }
 
     function onAddSectionChange() {
@@ -1003,6 +1149,7 @@
       const unit        = (document.getElementById('ni-unit')?.value || '').trim();
       const subtitle    = (document.getElementById('ni-subtitle')?.value || '').trim();
       const priceRaw    = (document.getElementById('ni-price')?.value || '').trim();
+      const photoFile   = document.getElementById('ni-photo')?.files?.[0] || null;
       if (!category_id) { setMsg('Выберите категорию.', true); return; }
       if (!name)        { setMsg('Укажите название.', true); return; }
       if (!unit)        { setMsg('Укажите единицу.', true); return; }
@@ -1020,6 +1167,18 @@
         }).catch(() => null);
         if (!r) { setMsg('Не удалось подключиться.', true); return; }
         if (!r.ok) { setMsg(await parseError(r), true); return; }
+        // backend возвращает созданный товар напрямую → берём фактический id
+        const created = await r.json().catch(() => ({}));
+        // newId валиден только как непустая строка
+        const newId = (created && typeof created.id === 'string' && created.id.trim()) ? created.id : null;
+        // фото — best-effort: при ошибке товар НЕ откатываем
+        let photoWarning = '';
+        if (photoFile && newId) {
+          const up = await uploadImageFile(newId, photoFile);
+          if (!up.ok) photoWarning = up.error || 'не удалось';
+        } else if (photoFile && !newId) {
+          photoWarning = 'сервер не вернул id созданного товара';
+        }
         let loaded = false;
         try {
           loaded = await reloadEditorCatalogFromServer();
@@ -1027,15 +1186,24 @@
           loaded = false;
         }
         if (!loaded) {
-          setMsg('Товар добавлен, но список не обновился — обновите страницу.', true);
+          setMsg('Товар добавлен' + (photoWarning ? ', но фото не загрузилось' : '') + '. Список не обновился — обновите страницу.', true);
           return;
         }
         editorLoadedOnce = false;
         renderEditor(editorCatalog, hotEditorCatalog);
+        renderStock([...editorCatalog, ...hotEditorCatalog]);
         const sectionSel = document.getElementById('ni-section');
         if (sectionSel) { sectionSel.value = section; onAddSectionChange(); }
         const freshMsg = document.getElementById('ni-msg');
-        if (freshMsg) { freshMsg.textContent = '✓ Товар добавлен'; freshMsg.style.cssText = 'font-size:12px;opacity:.7'; }
+        if (freshMsg) {
+          if (photoWarning) {
+            freshMsg.textContent = `Товар создан, фото не загрузилось: ${photoWarning}. Загрузите фото из карточки.`;
+            freshMsg.style.cssText = 'font-size:12px;color:#b91c1c';
+          } else {
+            freshMsg.textContent = '✓ Товар добавлен';
+            freshMsg.style.cssText = 'font-size:12px;opacity:.7';
+          }
+        }
       } finally {
         const b = document.getElementById('ni-submit');
         if (b) b.disabled = false;
@@ -1049,7 +1217,7 @@
       return `
         <div id="erow-${esc(item.id)}" oninput="markItemDirty('${esc(item.id)}')" style="border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#fafafa">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <span style="font-size:13px;font-weight:600">${esc(item.name)}</span>
+            <span style="font-size:13px;font-weight:600">${esc(item.name)}${item.hidden ? ' <span style="font-size:11px;font-weight:600;color:#b94a00;background:#fff3e0;border-radius:4px;padding:1px 6px;margin-left:6px">Скрыт с витрины</span>' : ''}</span>
             <span style="display:flex;gap:4px">
               <button onclick="moveItem('${esc(cat.id)}','${esc(item.id)}',-1)" style="padding:5px 10px;font-size:14px;border:1px solid #999;border-radius:6px;background:#e8e8e8;color:#333;cursor:pointer;font-weight:700;line-height:1" ${idx===0?'disabled':''}>↑</button>
               <button onclick="moveItem('${esc(cat.id)}','${esc(item.id)}',1)"  style="padding:5px 10px;font-size:14px;border:1px solid #999;border-radius:6px;background:#e8e8e8;color:#333;cursor:pointer;font-weight:700;line-height:1" ${idx===cat.items.length-1?'disabled':''}>↓</button>
@@ -1064,6 +1232,9 @@
             </label>
             <label style="font-size:12px;opacity:.6">Подзаголовок
               <input id="eu-${esc(item.id)}" value="${esc(item.subtitle||'')}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;box-sizing:border-box">
+            </label>
+            <label style="font-size:12px;opacity:.6">Единица
+              <input id="eunit-${esc(item.id)}" value="${esc(item.unit||'')}" style="width:100%;margin-top:2px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;box-sizing:border-box">
             </label>
           </div>
           <div style="padding-top:6px;margin-bottom:6px">
@@ -1095,6 +1266,15 @@
           <div style="display:flex;gap:6px;margin-bottom:4px">
             <button onclick="saveItem('${esc(item.id)}')" style="padding:6px 16px;border:none;border-radius:6px;background:#3390ec;color:#fff;font-size:13px;cursor:pointer">Сохранить</button>
             <button onclick="reloadItem('${esc(item.id)}')" style="padding:6px 14px;border:none;border-radius:6px;background:#eee;color:#333;font-size:13px;cursor:pointer">Сбросить изменения</button>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+            <label style="font-size:12px;opacity:.6">Категория
+              <select id="emovecat-${esc(item.id)}" oninput="event.stopPropagation()" onchange="moveItemToCategory('${esc(item.id)}', ${isHot})" style="margin-left:4px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+                ${(isHot ? hotEditorCatalog : editorCatalog).map(c => `<option value="${esc(c.id)}"${c.id === cat.id ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}
+              </select>
+            </label>
+            <button onclick="toggleHidden('${esc(item.id)}', ${item.hidden ? 'false' : 'true'})" style="padding:6px 12px;border:none;border-radius:6px;background:#8a6d3b;color:#fff;font-size:12px;cursor:pointer">${item.hidden ? 'Показать на витрине' : 'Скрыть с витрины'}</button>
+            <button onclick="deleteItem('${esc(item.id)}')" style="padding:6px 12px;border:none;border-radius:6px;background:#c0392b;color:#fff;font-size:12px;cursor:pointer">Удалить товар</button>
           </div>
           <div><span id="emsg-${esc(item.id)}" style="font-size:12px;opacity:.6"></span></div>
           <div style="margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -1320,7 +1500,7 @@
     }
 
     async function reloadCategoryRows(catId, isHot) {
-      const r = await fetch(`${base()}/api/catalog`).catch(() => null);
+      const r = await fetch(`${base()}/api/admin/catalog`, { headers: adminHeaders() }).catch(() => null);
       if (!r || !r.ok) return;
       const data = await r.json();
       const serverCats = isHot ? (data.hot_categories || []) : (data.categories || []);
@@ -1337,7 +1517,7 @@
     }
 
     async function reloadEditorCatalogFromServer() {
-      const r = await fetch(`${base()}/api/catalog`).catch(() => null);
+      const r = await fetch(`${base()}/api/admin/catalog`, { headers: adminHeaders() }).catch(() => null);
       if (!r || !r.ok) return false;
       const data = await r.json();
       editorCatalog = data.categories || [];
@@ -1486,6 +1666,8 @@
       }
       body.title    = title;
       body.subtitle = subtitle;
+      const unitEl = document.getElementById(`eunit-${itemId}`);
+      if (unitEl) body.unit = unitEl.value;
       if (prepWtEl)     body.prepared_wait_time  = prepWtEl.value;
       if (prepPtEl)     body.prepared_price_text = prepPtEl.value;
       if (prepNoteEl)   body.prepared_note       = prepNoteEl.value;
@@ -1518,37 +1700,45 @@
       refreshActivePromosPanel();
     }
 
-    async function uploadImage(itemId) {
-      clearEditorError();
+    async function uploadImageFile(itemId, file) {
+      // Общая загрузка фото товара (не привязана к DOM file-input).
+      // Возвращает { ok:true, image } или { ok:false, error }.
       const { value: token, error: tokenError } = sanitizeToken(tok());
-      if (tokenError) { showEditorError(tokenError); return; }
-      const fileInput = document.getElementById(`efile-${itemId}`);
-      if (!fileInput?.files?.length) { showEditorError('Выберите файл'); return; }
-      const msgEl = document.getElementById(`eimgmsg-${itemId}`);
-      if (msgEl) msgEl.textContent = 'Загружается…';
+      if (tokenError) return { ok: false, error: tokenError };
       const fd = new FormData();
-      fd.append('file', fileInput.files[0]);
+      fd.append('file', file);
       const r = await fetch(`${base()}/api/admin/catalog/items/${itemId}/image`, {
         method: 'POST',
         headers: { 'X-Admin-Token': token },
         body: fd,
-      }).catch(() => { showEditorError('Не удалось подключиться.'); if (msgEl) msgEl.textContent = ''; return null; });
-      if (!r) return;
-      if (!r.ok) { showEditorError(await parseError(r)); if (msgEl) msgEl.textContent = ''; return; }
-      const data = await r.json();
+      }).catch(() => null);
+      if (!r) return { ok: false, error: 'Не удалось подключиться.' };
+      if (!r.ok) return { ok: false, error: await parseError(r) };
+      const data = await r.json().catch(() => ({}));
+      return { ok: true, image: data.image };
+    }
+
+    async function uploadImage(itemId) {
+      clearEditorError();
+      const fileInput = document.getElementById(`efile-${itemId}`);
+      if (!fileInput?.files?.length) { showEditorError('Выберите файл'); return; }
+      const msgEl = document.getElementById(`eimgmsg-${itemId}`);
+      if (msgEl) msgEl.textContent = 'Загружается…';
+      const res = await uploadImageFile(itemId, fileInput.files[0]);
+      if (!res.ok) { showEditorError(res.error); if (msgEl) msgEl.textContent = ''; return; }
       if (msgEl) { msgEl.textContent = '✓ Фото обновлено'; setTimeout(() => { msgEl.textContent = ''; }, 3000); }
       const thumb = document.getElementById(`ethumb-${itemId}`);
-      if (thumb && data.image) {
-        thumb.src = `${base()}${data.image}?t=${Date.now()}`;
+      if (thumb && res.image) {
+        thumb.src = `${base()}${res.image}?t=${Date.now()}`;
         thumb.style.display = '';
       }
-      if (data.image && data.image.startsWith('/uploads/items/')) {
+      if (res.image && res.image.startsWith('/uploads/items/')) {
         const delBtn = document.getElementById(`edelete-${itemId}`);
         if (delBtn) delBtn.style.display = '';
       }
-      for (const cat of editorCatalog) {
-        for (const item of cat.items) {
-          if (item.id === itemId) { item.image = data.image; break; }
+      for (const cat of [...editorCatalog, ...hotEditorCatalog]) {
+        for (const item of (cat.items || [])) {
+          if (item.id === itemId) { item.image = res.image; break; }
         }
       }
       fileInput.value = '';
@@ -1603,6 +1793,90 @@
       const msgEl = document.getElementById(`emsg-${itemId}`);
       if (msgEl) { msgEl.textContent = '✓ Порядок обновлён'; setTimeout(() => { if (msgEl.textContent === '✓ Порядок обновлён') msgEl.textContent = ''; }, 2000); }
     }
+
+    async function toggleHidden(itemId, hide) {
+      if (hasDirtyItem(itemId)) { showEditorError('Сначала сохраните или сбросьте изменения'); return; }
+      const { value: token, error: tokenError } = sanitizeToken(tok());
+      if (tokenError) { showEditorError(tokenError); return; }
+      clearEditorError();
+      const r = await fetch(`${base()}/api/admin/catalog/items/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hidden: hide }),
+      }).catch(() => { showEditorError('Не удалось подключиться.'); return null; });
+      if (!r) return;
+      if (!r.ok) { showEditorError(await parseError(r)); return; }
+      // обновить редактор, reorder и стоп-лист из свежего полного admin-каталога
+      const loaded = await reloadEditorCatalogFromServer();
+      if (loaded) {
+        editorLoadedOnce = false;
+        renderEditor(editorCatalog, hotEditorCatalog);
+        renderStock([...editorCatalog, ...hotEditorCatalog]);
+      }
+    }
+
+    async function deleteItem(itemId) {
+      const { value: token, error: tokenError } = sanitizeToken(tok());
+      if (tokenError) { showEditorError(tokenError); return; }
+      let name = itemId;
+      for (const c of [...editorCatalog, ...hotEditorCatalog]) {
+        const it = (c.items || []).find(i => i.id === itemId);
+        if (it) { name = it.title || it.name || itemId; break; }
+      }
+      if (!confirm(`Удалить товар «${name}»? Действие необратимо.`)) return;
+      if (!confirm(`Точно удалить «${name}» безвозвратно? Старые заказы сохранятся, товар исчезнет из каталога и витрины.`)) return;
+      clearEditorError();
+      const r = await fetch(`${base()}/api/admin/catalog/items/${itemId}`, {
+        method: 'DELETE',
+        headers: { 'X-Admin-Token': token },
+      }).catch(() => { showEditorError('Не удалось подключиться.'); return null; });
+      if (!r) return;
+      if (!r.ok) { showEditorError(await parseError(r)); return; }
+      const data = await r.json().catch(() => ({}));
+      // обновить редактор, reorder и стоп-лист из полного admin-каталога
+      const loaded = await reloadEditorCatalogFromServer();
+      if (loaded) {
+        editorLoadedOnce = false;
+        renderEditor(editorCatalog, hotEditorCatalog);
+        renderStock([...editorCatalog, ...hotEditorCatalog]);
+      }
+      if (data && data.image_cleanup_warning) {
+        showEditorError('Товар удалён, но файл фото не удалось убрать на сервере (подробности в логе).');
+      }
+    }
+
+    async function moveItemToCategory(itemId, isHot) {
+      const sel = document.getElementById(`emovecat-${itemId}`);
+      if (!sel) return;
+      const targetCat = sel.value;
+      const cats = isHot ? hotEditorCatalog : editorCatalog;
+      let curCat = null;
+      for (const c of cats) { if ((c.items || []).some(i => i.id === itemId)) { curCat = c.id; break; } }
+      if (targetCat === curCat) return; // выбор текущей категории — не двигаем
+      if (hasDirtyItem(itemId)) {
+        showEditorError('Сначала сохраните или сбросьте изменения');
+        sel.value = curCat;
+        return;
+      }
+      const { value: token, error: tokenError } = sanitizeToken(tok());
+      if (tokenError) { showEditorError(tokenError); sel.value = curCat; return; }
+      clearEditorError();
+      const r = await fetch(`${base()}/api/admin/catalog/items/${itemId}/move`, {
+        method: 'POST',
+        headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category_id: targetCat }),
+      }).catch(() => { showEditorError('Не удалось подключиться.'); return null; });
+      if (!r) { sel.value = curCat; return; }
+      if (!r.ok) { showEditorError(await parseError(r)); sel.value = curCat; return; }
+      // перерисовать обе затронутые категории + стоп-лист из полного admin-каталога
+      const loaded = await reloadEditorCatalogFromServer();
+      if (loaded) {
+        editorLoadedOnce = false;
+        renderEditor(editorCatalog, hotEditorCatalog);
+        renderStock([...editorCatalog, ...hotEditorCatalog]);
+      }
+    }
+
     function currentFbJson() {
       return JSON.stringify({
         enabled:             document.getElementById('fb-enabled')?.checked ?? true,
@@ -1959,7 +2233,7 @@
 
     async function reloadItem(itemId) {
       clearEditorError();
-      const r = await fetch(`${base()}/api/catalog`)
+      const r = await fetch(`${base()}/api/admin/catalog`, { headers: adminHeaders() })
         .catch(() => { showEditorError('Не удалось подключиться.'); return null; });
       if (!r) return;
       if (!r.ok) { showEditorError(await parseError(r)); return; }

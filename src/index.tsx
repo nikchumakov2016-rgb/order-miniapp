@@ -324,19 +324,6 @@ const DEFAULT_WHERE_TO_BUY: WhereToBuyContent = {
   ],
 };
 
-const DISPLAY_CATEGORIES = [
-  { key: "pelmeni",  label: "Пельмени",  emoji: "🥟", frozenIds: ["pelmeni"],  hotIds: ["hot-pelm"]     },
-  { key: "manty",    label: "Манты",     emoji: "🥘", frozenIds: ["manty"],    hotIds: ["hot-manty"]    },
-  { key: "vareniki", label: "Вареники",  emoji: "🥟", frozenIds: ["vareniki"], hotIds: ["hot-var"]      },
-  { key: "kotlety",  label: "Котлеты",   emoji: "🍖", frozenIds: ["kotlety"],  hotIds: ["hot-kotl"]     },
-  { key: "tefteli",  label: "Тефтели",   emoji: "🧆", frozenIds: ["tefteli"],  hotIds: ["hot-teft"]     },
-  { key: "other",    label: "Прочее",    emoji: "🍽️", frozenIds: ["other"],    hotIds: ["hot-other"]    },
-  { key: "shashlik", label: "Шашлык маринованный", emoji: "🔥", frozenIds: ["shashlik"], hotIds: ["hot-shashlik"] },
-  { key: "farsh",    label: "Фарш",      emoji: "🥩", frozenIds: ["farsh"],    hotIds: [] as string[]   },
-];
-
-const HOT_LABELS: Record<string, string> = { shashlik: "Шашлык жареный" };
-
 function bonusRubWord(n: number): string {
   const abs = Math.abs(n) % 100;
   const m = abs % 10;
@@ -735,17 +722,23 @@ const isScheduledTimeInFuture =
 
   const visibleDisplayCategories = useMemo(() => {
     if (!catalog) return [];
-    const srcMap = new Map<string, Category>();
-    for (const cat of (catalog.categories ?? [])) srcMap.set(cat.id, cat);
-    for (const cat of (catalog.hot_categories ?? [])) srcMap.set(cat.id, cat);
-    return DISPLAY_CATEGORIES.flatMap(dc => {
-      const ids = mode === "hot" ? dc.hotIds : dc.frozenIds;
-      const sourceCats = ids.map(id => srcMap.get(id)).filter(Boolean) as Category[];
-      const items: DisplayItem[] = sourceCats.flatMap(c => c.items.map(it => ({ ...it, _srcCatId: c.id })));
+    const src = mode === "hot" ? (catalog.hot_categories ?? []) : (catalog.categories ?? []);
+    return src.flatMap(cat => {
+      const items: DisplayItem[] = cat.items.map(it => ({ ...it, _srcCatId: cat.id }));
       if (items.length === 0) return [];
-      return [{ key: dc.key, label: dc.label, emoji: dc.emoji, items, frozenIds: dc.frozenIds }];
+      return [{ key: cat.id, label: cat.name, emoji: cat.emoji, items }];
     });
   }, [catalog, mode]);
+
+  // Санитайзер активной категории: если выбранная категория исчезла из текущего
+  // режима (смена frozen/hot, удаление или reorder в админке) — сбрасываем подсветку,
+  // чтобы scroll-spy и чипы не ссылались на несуществующий якорь.
+  useEffect(() => {
+    if (activeCatId && activeCatId !== "discounts" &&
+        !visibleDisplayCategories.some(dc => dc.key === activeCatId)) {
+      setActiveCatId(null);
+    }
+  }, [visibleDisplayCategories, activeCatId]);
 
   const scrollingRef = useRef(false);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1405,7 +1398,7 @@ window.history.replaceState(null, '', _u.toString());
               background: activeCatId === dc.key ? theme.cta : tgVar("secondary-bg-color", theme.bg_chip),
               color: activeCatId === dc.key ? tgVar("button-text-color", "#ffffff") : tgVar("text-color", "#1a1a1a"),
             }}
-          >{(mode === "hot" && HOT_LABELS[dc.key]) || dc.label}</button>
+          >{dc.label}</button>
         ))}
         <button
           className="rp-chip rp-chip-all"
@@ -1498,7 +1491,7 @@ window.history.replaceState(null, '', _u.toString());
       {visibleDisplayCategories.map((dc) => (
         <div key={dc.key} id={`section-${mode}-${dc.key}`} style={S.section}>
           <div style={{ ...S.sectionTitle, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const }}>
-            <span>{dc.emoji} {(mode === "hot" && HOT_LABELS[dc.key]) || dc.label}</span>
+            <span>{dc.emoji} {dc.label}</span>
           </div>
           <div className="rp-grid">
             {dc.items.map((item) => {
@@ -1938,7 +1931,7 @@ window.history.replaceState(null, '', _u.toString());
                   }}
                 >
                   <span style={{ fontSize: 20, marginBottom: 4 }}>{dc.emoji}</span>
-                  {(mode === "hot" && HOT_LABELS[dc.key]) || dc.label}
+                  {dc.label}
                 </button>
               ))}
             </div>
