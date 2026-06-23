@@ -477,7 +477,7 @@ const isScheduledTimeInFuture =
     }
     fetch(`${API_BASE}/api/catalog`)
       .then((r) => r.json())
-      .then((data: Catalog) => { setCatalog(data); document.title = data.shop_name; setLoading(false); })
+      .then((data: Catalog) => { setCatalog(data); setLoading(false); })
       .catch((e) => { setError(`Не удалось загрузить каталог: ${e.message}`); setLoading(false); });
     fetch(`${API_BASE}/api/content/where-to-buy`)
       .then((r) => r.ok ? r.json() : null)
