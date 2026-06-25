@@ -70,6 +70,8 @@ type Catalog = {
   work_start_hour?: number;
   work_end_hour?: number;
   free_delivery_from?: number;
+  pickup_address?: string;
+  pickup_enabled?: boolean;
   phone?: string;
   order_confirmation_text?: string;
   banner?: CatalogBanner;
@@ -287,6 +289,15 @@ const STATUS_LABELS: Record<string, string> = {
   NOT_FOUND:            "Заказ не найден",
 };
 
+// Самовывоз меняет формулировки финальных статусов: ONWAY → «Готов к выдаче», DONE → «Выдан».
+function statusLabelFor(status: string, receiptMode: "DELIVERY" | "PICKUP"): string {
+  if (receiptMode === "PICKUP") {
+    if (status === "ONWAY") return "Готов к выдаче";
+    if (status === "DONE") return "Выдан";
+  }
+  return STATUS_LABELS[status] ?? status;
+}
+
 let _fallbackClientId: string | null = null;
 
 function getClientId(): string {
@@ -385,6 +396,8 @@ function App() {
   const [repeatNotice, setRepeatNotice] = useState<{ skipped: boolean; mixed: boolean } | null>(null);
   const cartRef = useRef<HTMLDivElement>(null);
   const [address, setAddress] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [receiptMode, setReceiptMode] = useState<"DELIVERY" | "PICKUP">("DELIVERY");
   const [phone, setPhone] = useState("");
   const [comment, setComment] = useState("");
   const [deliveryMode, setDeliveryMode] = useState<"ASAP" | "SCHEDULED">("ASAP");
@@ -419,6 +432,10 @@ const [orderBonusPinCanBeIssued, setOrderBonusPinCanBeIssued] = useState<boolean
 const [orderBonusCustomerHasCard, setOrderBonusCustomerHasCard] = useState<boolean>(false);
 const [orderBonusCardCreated, setOrderBonusCardCreated] = useState<boolean>(false);
 const [orderBonusEarnReversedAt, setOrderBonusEarnReversedAt] = useState<string | null>(null);
+// Способ получения и адрес пункта для статус-страницы (приходят из публичного status-ответа,
+// чтобы прямой /order-status/{token} был самодостаточным без загрузки каталога).
+const [orderReceiptMode, setOrderReceiptMode] = useState<"DELIVERY" | "PICKUP">("DELIVERY");
+const [orderPickupAddress, setOrderPickupAddress] = useState<string>("");
 const [mode, setMode] = useState<"frozen" | "hot">("frozen");
 const workStart = catalog?.work_start_hour ?? 10;
 const workEnd = catalog?.work_end_hour ?? 22;
@@ -427,6 +444,15 @@ const theme = { ...DEFAULT_THEME, ...catalog?.theme };
 const currency = catalog?.currency ?? "₽";
 const freeFrom = catalog?.free_delivery_from ?? 0;
 const bizPhone = catalog?.phone ?? "";
+const pickupEnabled = Boolean(catalog?.pickup_enabled && catalog?.pickup_address);
+const pickupAddress = catalog?.pickup_address ?? "";
+const isPickup = receiptMode === "PICKUP";
+
+// Fallback как в Box: если самовывоз недоступен (выключен/нет адреса), не оставляем
+// скрыто выбранный недоступный режим — принудительно возвращаем DELIVERY.
+useEffect(() => {
+  if (!pickupEnabled && receiptMode === "PICKUP") setReceiptMode("DELIVERY");
+}, [pickupEnabled, receiptMode]);
 
 const isWorkingHours = isWorkingHoursNow(undefined, workStart, workEnd);
 
@@ -611,6 +637,10 @@ const isScheduledTimeInFuture =
         .then(data => {
           if (!data?.status) return;
           setLiveStatus(data.status);
+          // Прямая token-ссылка в новой вкладке: статус-экран рендерится по orderSent.
+          // Публичный ответ содержит id — выставляем orderSent, если он ещё пуст,
+          // чтобы сохранённая ?token-ссылка открывала статус (а не меню).
+          if (data.id) setOrderSent(prev => prev || data.id);
           // legacy endpoint returns public_status_token — upgrade URL to ?token
           if (data.public_status_token && !orderToken) {
             setOrderToken(data.public_status_token);
@@ -626,6 +656,8 @@ const isScheduledTimeInFuture =
           setOrderBonusCustomerHasCard(Boolean(data.bonus_customer_has_card));
           setOrderBonusCardCreated(Boolean(data.bonus_card_created));
           setOrderBonusEarnReversedAt(data.bonus_earn_reversed_at ?? null);
+          setOrderReceiptMode(data.receipt_mode === "PICKUP" ? "PICKUP" : "DELIVERY");
+          setOrderPickupAddress(data.pickup_address ?? "");
         })
         .catch(err => {
           if (err === 404) { setLiveStatus('NOT_FOUND'); clearInterval(intervalId); }
@@ -827,13 +859,21 @@ const isScheduledTimeInFuture =
   }
 
   async function submitOrder() {
-    if (cartEntries.length === 0 || !address.trim()) return;
+    // Имя обязательно всегда; адрес обязателен только для доставки.
+    if (cartEntries.length === 0) return;
+    if (!customerName.trim()) return;
+    // Скрыто выбранный недоступный самовывоз отправить нельзя (защита независимо от fallback-эффекта).
+    if (isPickup && !pickupEnabled) return;
+    if (!isPickup && !address.trim()) return;
     setSending(true);
     setResult(null);
 
     const normalizedPhone = phone.trim().replace(/^8(\d{10})$/, "+7$1").replace(/^9(\d{9})$/, "+79$1");
     const payload = {
-      address: address.trim(),
+      customer_name: customerName.trim(),
+      receipt_mode: receiptMode,
+      // PICKUP: адрес доставки не отправляем (backend всё равно обнулит).
+      address: isPickup ? "" : address.trim(),
       phone: normalizedPhone,
       comment: comment.trim() || undefined,
       total_rub: cartTotal,
@@ -953,7 +993,12 @@ window.history.replaceState(null, '', _u.toString());
       </div>
       {liveStatus && (
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
-          Статус: {STATUS_LABELS[liveStatus] ?? liveStatus}
+          Статус: {statusLabelFor(liveStatus, orderReceiptMode)}
+        </div>
+      )}
+      {orderReceiptMode === "PICKUP" && orderPickupAddress && liveStatus !== "NOT_FOUND" && (
+        <div style={{ fontSize: 14, marginBottom: 8 }}>
+          🏠 Самовывоз: <strong>{orderPickupAddress}</strong>
         </div>
       )}
       {(() => {
@@ -1999,7 +2044,7 @@ window.history.replaceState(null, '', _u.toString());
                 );
               })()}
 
-              {freeFrom > 0 && (
+              {!isPickup && freeFrom > 0 && (
                 <div style={{ marginBottom: 10, fontSize: 13, color: "#5a5550", lineHeight: 1.5 }}>
                   {cartTotal >= freeFrom
                     ? <span style={{ fontWeight: 600 }}>🚚 Бесплатная доставка по Саракташу ✓</span>
@@ -2021,6 +2066,27 @@ window.history.replaceState(null, '', _u.toString());
               </div>
 
               <div style={{ marginTop: 20 }}>
+                <label style={S.label}>Имя</label>
+                <input style={S.input} placeholder="Как к вам обращаться" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+
+                {pickupEnabled && (
+                  <>
+                    <label style={S.label}>Способ получения</label>
+                    <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                      <button type="button" onClick={() => setReceiptMode("DELIVERY")} style={{
+                        ...S.addBtn, flex: 1,
+                        background: receiptMode === "DELIVERY" ? theme.cta : tgVar("secondary-bg-color", theme.bg_chip),
+                        color: receiptMode === "DELIVERY" ? "#ffffff" : tgVar("text-color", theme.text_primary),
+                      }}>Доставка</button>
+                      <button type="button" onClick={() => setReceiptMode("PICKUP")} style={{
+                        ...S.addBtn, flex: 1,
+                        background: receiptMode === "PICKUP" ? theme.cta : tgVar("secondary-bg-color", theme.bg_chip),
+                        color: receiptMode === "PICKUP" ? "#ffffff" : tgVar("text-color", theme.text_primary),
+                      }}>Самовывоз</button>
+                    </div>
+                  </>
+                )}
+
                 <label style={S.label}>Телефон для связи</label>
                 <input style={S.input} placeholder="Впишите сюда номер телефона" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" />
 
@@ -2086,13 +2152,21 @@ window.history.replaceState(null, '', _u.toString());
                   );
                 })()}
 
-                <label style={S.label}>Адрес доставки</label>
-                <input style={S.input} placeholder="Впишите сюда адрес доставки" value={address} onChange={(e) => setAddress(e.target.value)} />
+                {isPickup ? (
+                  <div style={{ margin: "6px 0 10px", padding: "10px 12px", background: tgVar("secondary-bg-color", "#f5f0eb"), borderRadius: 10, fontSize: 14, lineHeight: 1.45 }}>
+                    🏠 Самовывоз: <strong>{pickupAddress}</strong>
+                  </div>
+                ) : (
+                  <>
+                    <label style={S.label}>Адрес доставки</label>
+                    <input style={S.input} placeholder="Впишите сюда адрес доставки" value={address} onChange={(e) => setAddress(e.target.value)} />
+                  </>
+                )}
 
                 <label style={S.label}>Комментарий</label>
                 <input style={S.input} placeholder="Если есть, впишите комментарий к заказу" value={comment} onChange={(e) => setComment(e.target.value)} />
 
-                <label style={S.label}>Когда доставить</label>
+                <label style={S.label}>{isPickup ? "Когда забрать" : "Когда доставить"}</label>
                 <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
                   <button type="button" onClick={() => { if (isWorkingHours) setDeliveryMode("ASAP"); }} style={{
                     ...S.addBtn, flex: 1,
@@ -2164,7 +2238,9 @@ window.history.replaceState(null, '', _u.toString());
               <button
                 style={{ ...S.mainButton(
                     sending ||
-                    address.trim().length < 4 ||
+                    customerName.trim().length === 0 ||
+                    (isPickup && !pickupEnabled) ||
+                    (!isPickup && address.trim().length < 4) ||
                     phone.trim().replace(/\D/g, "").length < 10 ||
                     cartEntries.length === 0 ||
                     (!isWorkingHours && deliveryMode === "ASAP") ||
@@ -2175,7 +2251,9 @@ window.history.replaceState(null, '', _u.toString());
                   ), width: "100%", marginTop: 20, minHeight: 58, whiteSpace: "nowrap" as const, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" as const }}
                 disabled={
                     sending ||
-                    address.trim().length < 4 ||
+                    customerName.trim().length === 0 ||
+                    (isPickup && !pickupEnabled) ||
+                    (!isPickup && address.trim().length < 4) ||
                     phone.trim().replace(/\D/g, "").length < 10 ||
                     cartEntries.length === 0 ||
                     (!isWorkingHours && deliveryMode === "ASAP") ||

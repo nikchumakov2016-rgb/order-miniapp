@@ -145,6 +145,23 @@
     // Порядок кнопок в карточке: основной путь заказа сверху, вторичные (Новый/Отклонён) — внизу.
     const STATUS_BUTTON_ORDER = ['ACCEPTED', 'COOKING', 'ONWAY', 'DONE', 'NEW', 'REJECTED'];
 
+    // Самовывоз меняет формулировки финальных статусов: ONWAY → «Готов к выдаче», DONE → «Выдан».
+    function isPickupOrder(o) { return !!o && o.receipt_mode === 'PICKUP'; }
+    function statusLabel(o) {
+      if (isPickupOrder(o)) {
+        if (o.status === 'ONWAY') return '📦 Готов к выдаче';
+        if (o.status === 'DONE')  return '✅ Выдан';
+      }
+      return LABELS[o.status] ?? o.status;
+    }
+    function statusBtnLabel(s, o) {
+      if (isPickupOrder(o)) {
+        if (s === 'ONWAY') return '📦 Готов к выдаче';
+        if (s === 'DONE')  return '✅ Выдан';
+      }
+      return LABELS[s];
+    }
+
 
     function base() { return document.getElementById('apiBase').value.replace(/\/$/, ''); }
     function tok()  { return document.getElementById('token').value; }
@@ -335,14 +352,15 @@
       const cardTpl = o => `
         <div class="order">
           <div class="order-meta">
-            <b>#${o.id}</b> · <b>${LABELS[o.status] ?? o.status}</b> · ${o.total_rub}₽ · ${o.created_at ?? ''}${o.order_mode ? ' · ' + orderModeBadge(o.order_mode) : ''}${Boolean(o.is_test) ? ' · <span style="background:#ff3b30;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:0.5px;vertical-align:middle">ТЕСТ</span>' : ''}
+            <b>#${o.id}</b> · <b>${statusLabel(o)}</b> · ${o.total_rub}₽ · ${o.created_at ?? ''}${o.order_mode ? ' · ' + orderModeBadge(o.order_mode) : ''}${Boolean(o.is_test) ? ' · <span style="background:#ff3b30;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:0.5px;vertical-align:middle">ТЕСТ</span>' : ''}
           </div>
-          <div>${o.address ?? ''} · ${o.phone ?? ''}</div>
+          <div><span style="display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:4px;margin-right:6px;background:${isPickupOrder(o) ? '#e3f2e3;color:#2e7d32' : '#e7eefc;color:#2456c4'}">${isPickupOrder(o) ? 'Самовывоз' : 'Доставка'}</span>${o.customer_name ? esc(o.customer_name) + ' · ' : ''}${o.phone ?? ''}</div>
+          ${isPickupOrder(o) ? `<div>🏠 Самовывоз: ${esc(o.pickup_address || '')}</div>` : (o.address ? `<div>📍 ${o.address}</div>` : '')}
           ${o.comment ? `<div style="font-size:13px;opacity:.7">${o.comment}</div>` : ''}
           ${(o.items || []).length ? `<div style="font-size:13px;margin-top:4px">Состав:<br>${o.items.map(i => { const mp = o.order_mode === 'mixed' && i.item_order_mode ? (i.item_order_mode === 'hot' ? '🔥 · ' : '❄️ · ') : ''; return `• ${mp}${i.name} — ${i.qty} ${i.unit || 'шт'} × ${Math.round(i.price_rub)}₽`; }).join('<br>')}</div>` : ''}
           <div class="btns">
             ${STATUS_BUTTON_ORDER.map(s =>
-              `<button onclick="setStatus('${o.id}','${s}')" style="${s === o.status ? 'outline:2px solid #f0a830;font-weight:700' : 'opacity:.6'}">${LABELS[s]}</button>`
+              `<button onclick="setStatus('${o.id}','${s}')" style="${s === o.status ? 'outline:2px solid #f0a830;font-weight:700' : 'opacity:.6'}">${statusBtnLabel(s, o)}</button>`
             ).join('')}
           </div>
           ${bonusInfo(o)}
@@ -644,7 +662,10 @@
       }
       var rows = orders.map(function(o) {
         var dt = o.created_at ? o.created_at.slice(0, 10) : '—';
-        var st = ORDER_ST[o.status] || escapeHtml(o.status || '');
+        var st;
+        if (o.receipt_mode === 'PICKUP' && o.status === 'ONWAY') st = 'Готов к выдаче';
+        else if (o.receipt_mode === 'PICKUP' && o.status === 'DONE') st = 'Выдан';
+        else st = ORDER_ST[o.status] || escapeHtml(o.status || '');
         var total = o.total_after_bonus != null ? o.total_after_bonus : (o.total_rub || 0);
         var bonusParts = [];
         if (o.bonus_card_created) bonusParts.push('🆕 карта создана');
