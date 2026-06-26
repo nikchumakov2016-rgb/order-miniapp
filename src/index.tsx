@@ -400,6 +400,7 @@ function App() {
   const [receiptMode, setReceiptMode] = useState<"DELIVERY" | "PICKUP">("DELIVERY");
   const [phone, setPhone] = useState("");
   const [comment, setComment] = useState("");
+  const [privacyConsent, setPrivacyConsent] = useState(false);
   const [deliveryMode, setDeliveryMode] = useState<"ASAP" | "SCHEDULED">("ASAP");
   const [deliveryTime, setDeliveryTime] = useState("");
   const [prefilled, setPrefilled] = useState(false);
@@ -865,6 +866,8 @@ const isScheduledTimeInFuture =
     // Скрыто выбранный недоступный самовывоз отправить нельзя (защита независимо от fallback-эффекта).
     if (isPickup && !pickupEnabled) return;
     if (!isPickup && !address.trim()) return;
+    // Согласие на обработку ПД обязательно (паритет с backend-guard).
+    if (!privacyConsent) return;
     setSending(true);
     setResult(null);
 
@@ -879,6 +882,7 @@ const isScheduledTimeInFuture =
       total_rub: cartTotal,
       delivery_mode: deliveryMode,
       scheduled_for: deliveryMode === "SCHEDULED" && deliveryTime ? deliveryTime : null,
+      privacy_consent: privacyConsent,
       order_mode: (() => { const h = cartEntries.some(e => e.item._orderMode === "hot"); const f = cartEntries.some(e => e.item._orderMode !== "hot"); return h && f ? "mixed" : h ? "hot" : "frozen"; })(),
       items: cartEntries.map((e) => ({
         id: e.item.id,
@@ -2235,6 +2239,27 @@ window.history.replaceState(null, '', _u.toString());
 )}
               </div>
 
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 10, marginTop: 16, fontSize: 13, lineHeight: 1.45, cursor: "pointer", color: tgVar("text-color", theme.text_primary) }}>
+                <input
+                  type="checkbox"
+                  checked={privacyConsent}
+                  onChange={(e) => setPrivacyConsent(e.target.checked)}
+                  style={{ width: "auto", marginTop: 2, flexShrink: 0, accentColor: theme.cta }}
+                />
+                <span>
+                  Соглашаюсь на обработку персональных данных для оформления и выполнения заказа.{" "}
+                  <a href="/privacy.html" target="_blank" rel="noopener" style={{ color: theme.cta }}>
+                    Подробнее
+                  </a>{" "}
+                  (откроется в новой вкладке)
+                </span>
+              </label>
+              {!privacyConsent && (
+                <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6, lineHeight: 1.4 }}>
+                  Подтвердите согласие на обработку персональных данных
+                </div>
+              )}
+
               <button
                 style={{ ...S.mainButton(
                     sending ||
@@ -2247,6 +2272,7 @@ window.history.replaceState(null, '', _u.toString());
                     (deliveryMode === "SCHEDULED" && !isScheduledTimeValid) ||
 (isWorkingHours && deliveryMode === "SCHEDULED" && deliveryTime && !isScheduledTimeInFuture) ||
                     (useBonusChecked && bonusPin.length !== BONUS_PIN_LENGTH) ||
+                    !privacyConsent ||
                     hotMinNotMet
                   ), width: "100%", marginTop: 20, minHeight: 58, whiteSpace: "nowrap" as const, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" as const }}
                 disabled={
@@ -2260,6 +2286,7 @@ window.history.replaceState(null, '', _u.toString());
                     (deliveryMode === "SCHEDULED" && !isScheduledTimeValid) ||
 (isWorkingHours && deliveryMode === "SCHEDULED" && deliveryTime && !isScheduledTimeInFuture) ||
                     (useBonusChecked && bonusPin.length !== BONUS_PIN_LENGTH) ||
+                    !privacyConsent ||
                     hotMinNotMet
                   }
                 onClick={submitOrder}
