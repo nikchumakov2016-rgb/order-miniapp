@@ -829,7 +829,7 @@ const isScheduledTimeInFuture =
   }, []);
 
   useLayoutEffect(() => {
-    clearBonusAuthorization(true);
+    clearBonusAuthorization(false);
     setBonusError(null);
     setResult(prev => (prev && !prev.ok ? null : prev));
   }, [normalizedBonusPhone, clearBonusAuthorization]);
@@ -2159,11 +2159,18 @@ window.history.replaceState(null, '', _u.toString());
                 )}
 
                 <label style={S.label}>Телефон для связи</label>
-                <input style={S.input} placeholder="Впишите сюда номер телефона" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" />
+                <input
+                  style={S.input}
+                  placeholder="Впишите сюда номер телефона"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  type="tel"
+                  name="phone"
+                  inputMode="tel"
+                  autoComplete="tel"
+                />
 
                 {(() => {
-                  const digits = phone.replace(/\D/g, "");
-                  if (digits.length < 10) return null;
                   return (
                     <div style={{ margin: "6px 0 10px", padding: "10px 12px", background: tgVar("secondary-bg-color", "#f5f0eb"), borderRadius: 10, fontSize: 13 }}>
                       <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: useBonusChecked || bonusError ? 8 : 0 }}>
@@ -2258,7 +2265,15 @@ window.history.replaceState(null, '', _u.toString());
                 ) : (
                   <>
                     <label style={S.label}>Адрес доставки</label>
-                    <input style={S.input} placeholder="Впишите сюда адрес доставки" value={address} onChange={(e) => setAddress(e.target.value)} />
+                    <input
+                      style={S.input}
+                      placeholder="Впишите сюда адрес доставки"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      type="text"
+                      name="street-address"
+                      autoComplete="street-address"
+                    />
                   </>
                 )}
 
@@ -2356,6 +2371,7 @@ window.history.replaceState(null, '', _u.toString());
               )}
 
               <button
+                type="button"
                 style={{ ...S.mainButton(
                     sending ||
                     customerName.trim().length === 0 ||
