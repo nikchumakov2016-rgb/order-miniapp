@@ -1,7 +1,7 @@
 import './index.css';
 import React, { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from "react";
 import ReactDOM from "react-dom/client";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 
 declare global {
   interface Window {
@@ -411,6 +411,7 @@ function App() {
   const [customerName, setCustomerName] = useState("");
   const [receiptMode, setReceiptMode] = useState<"DELIVERY" | "PICKUP">("DELIVERY");
   const [phone, setPhone] = useState("");
+  const phoneInputRef = useRef<HTMLInputElement>(null);
   const [comment, setComment] = useState("");
   const [privacyConsent, setPrivacyConsent] = useState(false);
   const [deliveryMode, setDeliveryMode] = useState<"ASAP" | "SCHEDULED">("ASAP");
@@ -429,6 +430,17 @@ function App() {
   const normalizedBonusPhone = useMemo(() => normalizeCheckoutPhone(phone), [phone]);
   const normalizedBonusPhoneRef = useRef<string | null>(normalizedBonusPhone);
   normalizedBonusPhoneRef.current = normalizedBonusPhone;
+  const syncPhoneFromEvent = useCallback((event: React.SyntheticEvent<HTMLInputElement>) => {
+    const visiblePhone = event.currentTarget.value;
+    setPhone(currentPhone => currentPhone === visiblePhone ? currentPhone : visiblePhone);
+  }, []);
+  const syncVisiblePhone = useCallback(() => {
+    const visiblePhone = phoneInputRef.current?.value ?? phone;
+    if (visiblePhone !== phone) {
+      flushSync(() => setPhone(visiblePhone));
+    }
+    return visiblePhone;
+  }, [phone]);
   const resultRef = useRef<HTMLDivElement>(null);
   const [bannerDismissed, setBannerDismissed] = useState(() => {
     try { return localStorage.getItem('banner_hot_dismissed') === '1'; } catch { return false; }
@@ -846,9 +858,10 @@ const isScheduledTimeInFuture =
   }, [maxBonus, bonusCard]);
 
   async function verifyBonusCard() {
-    if (!normalizedBonusPhone || !pinReady || bonusLoading || bonusVerifyAbortRef.current) return;
+    const visiblePhone = syncVisiblePhone();
+    const requestPhone = normalizeCheckoutPhone(visiblePhone);
+    if (!requestPhone || !pinReady || bonusLoading || bonusVerifyAbortRef.current) return;
 
-    const requestPhone = normalizedBonusPhone;
     const requestId = bonusVerifySeqRef.current + 1;
     bonusVerifySeqRef.current = requestId;
     const controller = new AbortController();
@@ -918,6 +931,9 @@ const isScheduledTimeInFuture =
   }
 
   async function submitOrder() {
+    const visiblePhone = syncVisiblePhone();
+    const visibleNormalizedBonusPhone = normalizeCheckoutPhone(visiblePhone);
+    if (visiblePhone.trim().replace(/\D/g, "").length < 10) return;
     // Имя обязательно всегда; адрес обязателен только для доставки.
     if (cartEntries.length === 0) return;
     if (!customerName.trim()) return;
@@ -929,8 +945,21 @@ const isScheduledTimeInFuture =
     setSending(true);
     setResult(null);
 
-    const normalizedPhone = phone.trim().replace(/^8(\d{10})$/, "+7$1").replace(/^9(\d{9})$/, "+79$1");
-    const attemptedBonusUse = bonusUse;
+    const normalizedPhone = visiblePhone.trim().replace(/^8(\d{10})$/, "+7$1").replace(/^9(\d{9})$/, "+79$1");
+    const submittedBonusVerified = Boolean(
+      useBonusChecked &&
+      bonusCard &&
+      pinReady &&
+      visibleNormalizedBonusPhone &&
+      verifiedBonusPhone === visibleNormalizedBonusPhone
+    );
+    const submittedMaxBonus = submittedBonusVerified && bonusCard
+      ? Math.min(bonusCard.available_balance, Math.floor(cartTotal * BONUS_MAX_REDEEM_PERCENT / 100))
+      : 0;
+    const submittedBonusUse = submittedBonusVerified
+      ? Math.min(requestedBonusAmount, submittedMaxBonus)
+      : 0;
+    const attemptedBonusUse = submittedBonusUse;
     const payload = {
       customer_name: customerName.trim(),
       receipt_mode: receiptMode,
@@ -951,8 +980,8 @@ const isScheduledTimeInFuture =
         unit: e.item.unit,
         item_order_mode: e.item._orderMode ?? "frozen",
       })),
-      bonus_use: bonusUse,
-      bonus_pin: bonusUse > 0 ? bonusPin : undefined,
+      bonus_use: submittedBonusUse,
+      bonus_pin: submittedBonusUse > 0 ? bonusPin : undefined,
     };
 
     try {
@@ -2160,10 +2189,13 @@ window.history.replaceState(null, '', _u.toString());
 
                 <label style={S.label}>Телефон для связи</label>
                 <input
+                  ref={phoneInputRef}
                   style={S.input}
                   placeholder="Впишите сюда номер телефона"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={syncPhoneFromEvent}
+                  onInput={syncPhoneFromEvent}
+                  onBlur={syncPhoneFromEvent}
                   type="tel"
                   name="phone"
                   inputMode="tel"
@@ -2179,6 +2211,7 @@ window.history.replaceState(null, '', _u.toString());
                           checked={useBonusChecked}
                           onChange={e => {
                             if (e.target.checked) {
+                              syncVisiblePhone();
                               setUseBonusChecked(true);
                               setBonusError(null);
                             } else {
