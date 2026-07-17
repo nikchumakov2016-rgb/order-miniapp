@@ -2310,9 +2310,9 @@ window.history.replaceState(null, '', _u.toString());
                       {!useBonusChecked && (
                         <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>
                           {cartTotal >= BONUS_MIN_ORDER_TOTAL ? (
-                            <>🎁 После выполнения заказа начислим <strong>{expectedBonusEarn}</strong> {bonusRubWord(expectedBonusEarn)}. Если карты ещё нет — создадим её автоматически.</>
+                            <>🎁 После выполнения заказа начислим <strong style={{ fontSize: 14 }}>{expectedBonusEarn} {bonusRubWord(expectedBonusEarn)}</strong>. Если карты ещё нет — создадим её автоматически.</>
                           ) : (
-                            <>🎁 Если у вас уже есть бонусная карта, после выполнения заказа начислим <strong>{expectedBonusEarn}</strong> {bonusRubWord(expectedBonusEarn)}.</>
+                            <>🎁 Если у вас уже есть бонусная карта, после выполнения заказа начислим <strong style={{ fontSize: 14 }}>{expectedBonusEarn} {bonusRubWord(expectedBonusEarn)}</strong>.</>
                           )}
                         </div>
                       )}
