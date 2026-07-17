@@ -1,5 +1,5 @@
 import './index.css';
-import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 import { createPortal } from "react-dom";
 
@@ -344,6 +344,18 @@ function bonusRubWord(n: number): string {
   return "бонусных рублей";
 }
 
+function normalizeCheckoutPhone(raw: string): string | null {
+  let digits = raw.replace(/\D/g, "");
+  if (digits.length === 10 && digits.startsWith("9")) {
+    digits = `7${digits}`;
+  } else if (digits.length === 11 && (digits[0] === "7" || digits[0] === "8") && digits[1] === "9") {
+    digits = `7${digits.slice(1)}`;
+  }
+  return digits.length === 11 && digits.startsWith("79") ? `+${digits}` : null;
+}
+
+const BONUS_LOOKUP_ERROR = "Не удалось подтвердить бонусы. Проверьте телефон и PIN или оформите заказ без бонусов.";
+
 function App() {
   const API_BASE = (import.meta as any).env?.VITE_API_BASE ?? "";
   const BONUS_MIN_ORDER_TOTAL = 1500;
@@ -405,10 +417,18 @@ function App() {
   const [deliveryTime, setDeliveryTime] = useState("");
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
-  const [bonusCard, setBonusCard] = useState<{ exists: boolean; available_balance: number } | null>(null);
+  const [bonusCard, setBonusCard] = useState<{ available_balance: number } | null>(null);
   const [bonusLoading, setBonusLoading] = useState(false);
   const [useBonusChecked, setUseBonusChecked] = useState(false);
   const [bonusPin, setBonusPin] = useState("");
+  const [bonusAmount, setBonusAmount] = useState("");
+  const [bonusError, setBonusError] = useState<string | null>(null);
+  const [verifiedBonusPhone, setVerifiedBonusPhone] = useState<string | null>(null);
+  const bonusVerifyAbortRef = useRef<AbortController | null>(null);
+  const bonusVerifySeqRef = useRef(0);
+  const normalizedBonusPhone = useMemo(() => normalizeCheckoutPhone(phone), [phone]);
+  const normalizedBonusPhoneRef = useRef<string | null>(normalizedBonusPhone);
+  normalizedBonusPhoneRef.current = normalizedBonusPhone;
   const resultRef = useRef<HTMLDivElement>(null);
   const [bannerDismissed, setBannerDismissed] = useState(() => {
     try { return localStorage.getItem('banner_hot_dismissed') === '1'; } catch { return false; }
@@ -709,11 +729,15 @@ const isScheduledTimeInFuture =
   const cartEntries = useMemo(() => Object.values(cart), [cart]);
   const cartCount = useMemo(() => cartEntries.reduce((s, e) => s + e.qty, 0), [cartEntries]);
   const cartTotal = useMemo(() => cartEntries.reduce((s, e) => s + e.item.price * e.qty, 0), [cartEntries]);
-  const maxBonus = (bonusCard?.exists && bonusCard.available_balance > 0)
+  const bonusVerified = Boolean(bonusCard && verifiedBonusPhone && verifiedBonusPhone === normalizedBonusPhone);
+  const maxBonus = (bonusVerified && bonusCard && bonusCard.available_balance > 0)
     ? Math.min(bonusCard.available_balance, Math.floor(cartTotal * BONUS_MAX_REDEEM_PERCENT / 100))
     : 0;
   const pinReady = bonusPin.length === BONUS_PIN_LENGTH;
-  const bonusUse = (useBonusChecked && pinReady && maxBonus > 0) ? maxBonus : 0;
+  const requestedBonusAmount = Math.max(0, Math.floor(Number(bonusAmount) || 0));
+  const bonusUse = (useBonusChecked && bonusVerified && pinReady && maxBonus > 0)
+    ? Math.min(requestedBonusAmount, maxBonus)
+    : 0;
   const totalAfterBonus = cartTotal - bonusUse;
   const itemsWord = (n: number) => n % 10 === 1 && n % 100 !== 11 ? "товар" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? "товара" : "товаров";
   const freeProgress = freeFrom > 0 ? Math.min(cartTotal / freeFrom, 1) : 0;
@@ -792,32 +816,82 @@ const isScheduledTimeInFuture =
 
   const IMAGE_POS: Record<string, string> = { o1: "center 70%", k3: "center 35%", p1: "center 30%" };
 
-  useEffect(() => {
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length < 10) {
-      setBonusCard(null);
-      setUseBonusChecked(false);
-      setBonusPin("");
-      return;
-    }
-    setBonusLoading(true);
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      fetch(`${API_BASE}/api/bonus-card?phone=${encodeURIComponent(phone.trim())}`, { signal: controller.signal })
-        .then(r => r.ok ? r.json() : null)
-        .then(data => { setBonusCard(data ?? null); })
-        .catch(() => {})
-        .finally(() => setBonusLoading(false));
-    }, 600);
-    return () => { clearTimeout(timer); controller.abort(); setBonusLoading(false); };
-  }, [phone, API_BASE]);
+  const clearBonusAuthorization = useCallback((disableOptIn = true) => {
+    bonusVerifySeqRef.current += 1;
+    bonusVerifyAbortRef.current?.abort();
+    bonusVerifyAbortRef.current = null;
+    setBonusLoading(false);
+    setBonusCard(null);
+    setVerifiedBonusPhone(null);
+    setBonusPin("");
+    setBonusAmount("");
+    if (disableOptIn) setUseBonusChecked(false);
+  }, []);
+
+  useLayoutEffect(() => {
+    clearBonusAuthorization(true);
+    setBonusError(null);
+    setResult(prev => (prev && !prev.ok ? null : prev));
+  }, [normalizedBonusPhone, clearBonusAuthorization]);
+
+  useEffect(() => () => {
+    bonusVerifySeqRef.current += 1;
+    bonusVerifyAbortRef.current?.abort();
+    bonusVerifyAbortRef.current = null;
+  }, []);
 
   useEffect(() => {
-    if (maxBonus === 0) {
-      setUseBonusChecked(false);
-      setBonusPin("");
+    if (!bonusCard) return;
+    setBonusAmount(prev => String(Math.min(Math.max(0, Math.floor(Number(prev) || 0)), maxBonus)));
+  }, [maxBonus, bonusCard]);
+
+  async function verifyBonusCard() {
+    if (!normalizedBonusPhone || !pinReady || bonusLoading || bonusVerifyAbortRef.current) return;
+
+    const requestPhone = normalizedBonusPhone;
+    const requestId = bonusVerifySeqRef.current + 1;
+    bonusVerifySeqRef.current = requestId;
+    const controller = new AbortController();
+    bonusVerifyAbortRef.current = controller;
+    const timeoutId = window.setTimeout(() => controller.abort(), 8000);
+
+    setBonusLoading(true);
+    setBonusError(null);
+    setBonusCard(null);
+    setVerifiedBonusPhone(null);
+    setBonusAmount("");
+
+    try {
+      const response = await fetch(`${API_BASE}/api/bonus-card/details`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: requestPhone, pin: bonusPin }),
+        signal: controller.signal,
+      });
+      const data = await response.json().catch(() => null);
+      const availableBalance = Number(data?.card?.available_balance);
+      if (!response.ok || data?.ok !== true || !Number.isFinite(availableBalance) || availableBalance < 0) {
+        throw new Error("invalid bonus response");
+      }
+      if (bonusVerifySeqRef.current !== requestId || normalizedBonusPhoneRef.current !== requestPhone) return;
+
+      const safeBalance = Math.floor(availableBalance);
+      const initialAmount = Math.min(safeBalance, Math.floor(cartTotal * BONUS_MAX_REDEEM_PERCENT / 100));
+      setBonusCard({ available_balance: safeBalance });
+      setVerifiedBonusPhone(requestPhone);
+      setBonusAmount(String(initialAmount));
+    } catch {
+      if (bonusVerifySeqRef.current !== requestId || normalizedBonusPhoneRef.current !== requestPhone) return;
+      clearBonusAuthorization(true);
+      setBonusError(BONUS_LOOKUP_ERROR);
+    } finally {
+      window.clearTimeout(timeoutId);
+      if (bonusVerifySeqRef.current === requestId) {
+        bonusVerifyAbortRef.current = null;
+        setBonusLoading(false);
+      }
     }
-  }, [maxBonus]);
+  }
 
   async function fetchPin() {
     if (!orderToken) return;
@@ -856,6 +930,7 @@ const isScheduledTimeInFuture =
     setResult(null);
 
     const normalizedPhone = phone.trim().replace(/^8(\d{10})$/, "+7$1").replace(/^9(\d{9})$/, "+79$1");
+    const attemptedBonusUse = bonusUse;
     const payload = {
       customer_name: customerName.trim(),
       receipt_mode: receiptMode,
@@ -907,7 +982,17 @@ const isScheduledTimeInFuture =
 
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) {
-        setResult({ ok: false, text: data?.detail || `Ошибка: ${JSON.stringify(data)}` });
+        const detail = data?.detail || `Ошибка: ${JSON.stringify(data)}`;
+        if (attemptedBonusUse > 0) {
+          clearBonusAuthorization(true);
+          setBonusError(null);
+          setResult({
+            ok: false,
+            text: `${detail}. Бонусы отключены; проверьте итог без списания и повторите заказ.`,
+          });
+        } else {
+          setResult({ ok: false, text: detail });
+        }
       } else {
         const oid = data.order_id ?? "—";
 const status = (data.status ?? "NEW") as "NEW" | "PENDING_CONFIRMATION";
@@ -934,9 +1019,8 @@ window.history.replaceState(null, '', _u.toString());
         setComment("");
         setDeliveryMode(isWorkingHours ? "ASAP" : "SCHEDULED");
         setDeliveryTime("");
-        setUseBonusChecked(false);
-        setBonusPin("");
-        setBonusCard(null);
+        clearBonusAuthorization(true);
+        setBonusError(null);
       }
     } catch (e: any) {
       setResult({ ok: false, text: `Ошибка сети: ${e.message}` });
@@ -2080,45 +2164,29 @@ window.history.replaceState(null, '', _u.toString());
                 {(() => {
                   const digits = phone.replace(/\D/g, "");
                   if (digits.length < 10) return null;
-                  if (bonusLoading) return (
-                    <div style={{ fontSize: 13, opacity: 0.5, margin: "4px 0 10px" }}>Проверяем бонусный счёт...</div>
-                  );
-                  if (!bonusCard) return null;
-                  if (!bonusCard.exists) {
-                    if (cartTotal < BONUS_MIN_ORDER_TOTAL) return (
-                      <div style={{ fontSize: 13, color: themeVar("text_secondary"), margin: "4px 0 10px", lineHeight: 1.45 }}>
-                        🎁 До бонусной карты осталось <strong>{BONUS_MIN_ORDER_TOTAL - cartTotal}{currency}</strong>
-                      </div>
-                    );
-                    return (
-                      <div style={{ fontSize: 13, color: "#5a8a5a", margin: "4px 0 10px", lineHeight: 1.45 }}>
-                        🎁 После доставки создадим бонусную карту и начислим <strong>{Math.floor(cartTotal * BONUS_EARN_PERCENT / 100)}</strong> {bonusRubWord(Math.floor(cartTotal * BONUS_EARN_PERCENT / 100))}
-                      </div>
-                    );
-                  }
                   return (
                     <div style={{ margin: "6px 0 10px", padding: "10px 12px", background: tgVar("secondary-bg-color", "#f5f0eb"), borderRadius: 10, fontSize: 13 }}>
-                      <div style={{ marginBottom: 6 }}>
-                        💳 Доступно: <strong>{bonusCard.available_balance}</strong> {bonusRubWord(bonusCard.available_balance)}
-                      </div>
-                      {maxBonus > 0 ? (
-                        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 6 }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: useBonusChecked || bonusError ? 8 : 0 }}>
+                        <input
+                          type="checkbox"
+                          checked={useBonusChecked}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setUseBonusChecked(true);
+                              setBonusError(null);
+                            } else {
+                              clearBonusAuthorization(true);
+                              setBonusError(null);
+                            }
+                          }}
+                        />
+                        Использовать бонусные рубли
+                      </label>
+
+                      {useBonusChecked && !bonusVerified && (
+                        <div>
                           <input
-                            type="checkbox"
-                            checked={useBonusChecked}
-                            onChange={e => { setUseBonusChecked(e.target.checked); setBonusPin(""); }}
-                          />
-                          Списать {maxBonus} {bonusRubWord(maxBonus)} (максимум {BONUS_MAX_REDEEM_PERCENT}% заказа)
-                        </label>
-                      ) : bonusCard.available_balance <= 0 ? (
-                        <div style={{ opacity: 0.6 }}>На карте пока нет бонусных рублей для списания.</div>
-                      ) : (
-                        <div style={{ opacity: 0.6 }}>Списание недоступно для этой суммы заказа.</div>
-                      )}
-                      {useBonusChecked ? (
-                        <>
-                          <input
-                            style={{ ...S.input, marginTop: 6 }}
+                            style={{ ...S.input, marginTop: 2 }}
                             type="password"
                             inputMode="numeric"
                             placeholder={`Введите PIN (${BONUS_PIN_LENGTH} цифр)`}
@@ -2126,13 +2194,57 @@ window.history.replaceState(null, '', _u.toString());
                             onChange={e => setBonusPin(e.target.value.replace(/\D/g, "").slice(0, BONUS_PIN_LENGTH))}
                             maxLength={BONUS_PIN_LENGTH}
                           />
+                          <button
+                            type="button"
+                            onClick={verifyBonusCard}
+                            disabled={!normalizedBonusPhone || !pinReady || bonusLoading}
+                            style={{ ...S.addBtn, width: "100%", marginTop: 6, opacity: (!normalizedBonusPhone || !pinReady || bonusLoading) ? 0.55 : 1 }}
+                          >
+                            {bonusLoading ? "Проверяем..." : "Проверить бонусы"}
+                          </button>
+                        </div>
+                      )}
+
+                      {useBonusChecked && bonusVerified && bonusCard && (
+                        <div>
+                          <div style={{ marginBottom: 6 }}>
+                            💳 Доступно: <strong>{bonusCard.available_balance}</strong> {bonusRubWord(bonusCard.available_balance)}
+                          </div>
+                          {maxBonus > 0 ? (
+                            <>
+                              <label style={{ display: "block", marginBottom: 4 }}>
+                                Списать бонусных рублей (до {maxBonus})
+                              </label>
+                              <input
+                                style={S.input}
+                                type="number"
+                                inputMode="numeric"
+                                min={0}
+                                max={maxBonus}
+                                value={bonusAmount}
+                                onChange={e => setBonusAmount(e.target.value.replace(/\D/g, ""))}
+                              />
+                            </>
+                          ) : bonusCard.available_balance <= 0 ? (
+                            <div style={{ opacity: 0.6 }}>На карте пока нет бонусных рублей для списания.</div>
+                          ) : (
+                            <div style={{ opacity: 0.6 }}>Списание недоступно для этой суммы заказа.</div>
+                          )}
                           <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>
                             При списании бонусных рублей новых начислений за этот заказ не будет.
                           </div>
-                        </>
-                      ) : (
+                        </div>
+                      )}
+
+                      {bonusError && (
+                        <div style={{ fontSize: 12, color: "#9b2c2c", lineHeight: 1.4 }}>
+                          {bonusError}
+                        </div>
+                      )}
+
+                      {!useBonusChecked && !bonusError && (
                         <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>
-                          За этот заказ будет начислено: {Math.floor(cartTotal * BONUS_EARN_PERCENT / 100)} {bonusRubWord(Math.floor(cartTotal * BONUS_EARN_PERCENT / 100))}
+                          Бонусы необязательны — заказ можно оформить без списания.
                         </div>
                       )}
                     </div>
@@ -2254,7 +2366,7 @@ window.history.replaceState(null, '', _u.toString());
                     (!isWorkingHours && deliveryMode === "ASAP") ||
                     (deliveryMode === "SCHEDULED" && !isScheduledTimeValid) ||
 (isWorkingHours && deliveryMode === "SCHEDULED" && deliveryTime && !isScheduledTimeInFuture) ||
-                    (useBonusChecked && bonusPin.length !== BONUS_PIN_LENGTH) ||
+                    (useBonusChecked && (!bonusVerified || bonusLoading || bonusUse <= 0)) ||
                     !privacyConsent ||
                     hotMinNotMet
                   ), width: "100%", marginTop: 20, minHeight: 58, whiteSpace: "nowrap" as const, display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" as const }}
@@ -2268,7 +2380,7 @@ window.history.replaceState(null, '', _u.toString());
                     (!isWorkingHours && deliveryMode === "ASAP") ||
                     (deliveryMode === "SCHEDULED" && !isScheduledTimeValid) ||
 (isWorkingHours && deliveryMode === "SCHEDULED" && deliveryTime && !isScheduledTimeInFuture) ||
-                    (useBonusChecked && bonusPin.length !== BONUS_PIN_LENGTH) ||
+                    (useBonusChecked && (!bonusVerified || bonusLoading || bonusUse <= 0)) ||
                     !privacyConsent ||
                     hotMinNotMet
                   }
