@@ -403,7 +403,6 @@ function App() {
   const [privacyConsent, setPrivacyConsent] = useState(false);
   const [deliveryMode, setDeliveryMode] = useState<"ASAP" | "SCHEDULED">("ASAP");
   const [deliveryTime, setDeliveryTime] = useState("");
-  const [prefilled, setPrefilled] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [bonusCard, setBonusCard] = useState<{ exists: boolean; available_balance: number } | null>(null);
@@ -596,20 +595,6 @@ const isScheduledTimeInFuture =
     };
   }, [API_BASE, loadPromotions]);
 
-  useEffect(() => {
-    const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
-    if (!tgUser?.id) return;
-    fetch(`${API_BASE}/api/clients/${tgUser.id}/last`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (!prefilled && data.address) {
-          setAddress(data.address);
-          setPhone(data.phone);
-          setPrefilled(true);
-        }
-      }).catch(() => {});
-  }, [API_BASE, prefilled]);
-
   function applyLocalContact() {
     try {
       const saved = localStorage.getItem('order_contact');
@@ -621,8 +606,7 @@ const isScheduledTimeInFuture =
   }
 
   useEffect(() => {
-    const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
-    if (!tgUser?.id) applyLocalContact();
+    applyLocalContact();
   }, []);
 
 
@@ -1169,8 +1153,7 @@ window.history.replaceState(null, '', _u.toString());
           setOrderBonusPinCanBeIssued(false);
           setOrderBonusCardCreated(false);
           setOrderBonusEarnReversedAt(null);
-          if ((window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id) setPrefilled(false);
-          else applyLocalContact();
+          applyLocalContact();
           const _u = new URL(window.location.href);
           _u.searchParams.delete('order');
           _u.searchParams.delete('token');
