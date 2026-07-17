@@ -738,6 +738,7 @@ const isScheduledTimeInFuture =
   const cartEntries = useMemo(() => Object.values(cart), [cart]);
   const cartCount = useMemo(() => cartEntries.reduce((s, e) => s + e.qty, 0), [cartEntries]);
   const cartTotal = useMemo(() => cartEntries.reduce((s, e) => s + e.item.price * e.qty, 0), [cartEntries]);
+  const expectedBonusEarn = Math.floor(cartTotal * BONUS_EARN_PERCENT / 100);
   const bonusVerified = Boolean(
     bonusCard &&
     verifiedBonusPhone &&
@@ -2288,7 +2289,11 @@ window.history.replaceState(null, '', _u.toString());
 
                       {!useBonusChecked && !bonusError && (
                         <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>
-                          Бонусы необязательны — заказ можно оформить без списания.
+                          {cartTotal >= BONUS_MIN_ORDER_TOTAL ? (
+                            <>🎁 После выполнения заказа начислим <strong>{expectedBonusEarn}</strong> {bonusRubWord(expectedBonusEarn)}. Если карты ещё нет — создадим её автоматически.</>
+                          ) : (
+                            <>🎁 Если у вас уже есть бонусная карта, после выполнения заказа начислим <strong>{expectedBonusEarn}</strong> {bonusRubWord(expectedBonusEarn)}.</>
+                          )}
                         </div>
                       )}
                     </div>
@@ -2308,8 +2313,7 @@ window.history.replaceState(null, '', _u.toString());
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
                       type="text"
-                      name="street-address"
-                      autoComplete="street-address"
+                      autoComplete="off"
                     />
                   </>
                 )}
