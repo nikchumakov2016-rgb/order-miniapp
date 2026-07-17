@@ -1,7 +1,7 @@
 import './index.css';
 import React, { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from "react";
 import ReactDOM from "react-dom/client";
-import { createPortal, flushSync } from "react-dom";
+import { createPortal } from "react-dom";
 
 declare global {
   interface Window {
@@ -427,20 +427,17 @@ function App() {
   const [verifiedBonusPhone, setVerifiedBonusPhone] = useState<string | null>(null);
   const bonusVerifyAbortRef = useRef<AbortController | null>(null);
   const bonusVerifySeqRef = useRef(0);
-  const normalizedBonusPhone = useMemo(() => normalizeCheckoutPhone(phone), [phone]);
-  const normalizedBonusPhoneRef = useRef<string | null>(normalizedBonusPhone);
-  normalizedBonusPhoneRef.current = normalizedBonusPhone;
-  const syncPhoneFromEvent = useCallback((event: React.SyntheticEvent<HTMLInputElement>) => {
-    const visiblePhone = event.currentTarget.value;
+  const readVisiblePhone = useCallback(() => phoneInputRef.current?.value ?? phone, [phone]);
+  const syncPhoneStateFromDom = useCallback(() => {
+    const visiblePhone = readVisiblePhone();
     setPhone(currentPhone => currentPhone === visiblePhone ? currentPhone : visiblePhone);
-  }, []);
-  const syncVisiblePhone = useCallback(() => {
-    const visiblePhone = phoneInputRef.current?.value ?? phone;
-    if (visiblePhone !== phone) {
-      flushSync(() => setPhone(visiblePhone));
-    }
     return visiblePhone;
-  }, [phone]);
+  }, [readVisiblePhone]);
+  const setPhoneProgrammatically = useCallback((nextPhone: string) => {
+    setPhone(nextPhone);
+    if (phoneInputRef.current) phoneInputRef.current.value = nextPhone;
+  }, []);
+  const normalizedBonusPhone = useMemo(() => normalizeCheckoutPhone(phone), [phone]);
   const resultRef = useRef<HTMLDivElement>(null);
   const [bannerDismissed, setBannerDismissed] = useState(() => {
     try { return localStorage.getItem('banner_hot_dismissed') === '1'; } catch { return false; }
@@ -633,7 +630,7 @@ const isScheduledTimeInFuture =
       if (!saved) return;
       const { phone: p, address: a } = JSON.parse(saved);
       if (a) setAddress(a);
-      if (p) setPhone(p);
+      if (p) setPhoneProgrammatically(p);
     } catch {}
   }
 
@@ -741,7 +738,11 @@ const isScheduledTimeInFuture =
   const cartEntries = useMemo(() => Object.values(cart), [cart]);
   const cartCount = useMemo(() => cartEntries.reduce((s, e) => s + e.qty, 0), [cartEntries]);
   const cartTotal = useMemo(() => cartEntries.reduce((s, e) => s + e.item.price * e.qty, 0), [cartEntries]);
-  const bonusVerified = Boolean(bonusCard && verifiedBonusPhone && verifiedBonusPhone === normalizedBonusPhone);
+  const bonusVerified = Boolean(
+    bonusCard &&
+    verifiedBonusPhone &&
+    verifiedBonusPhone === normalizeCheckoutPhone(readVisiblePhone())
+  );
   const maxBonus = (bonusVerified && bonusCard && bonusCard.available_balance > 0)
     ? Math.min(bonusCard.available_balance, Math.floor(cartTotal * BONUS_MAX_REDEEM_PERCENT / 100))
     : 0;
@@ -858,7 +859,7 @@ const isScheduledTimeInFuture =
   }, [maxBonus, bonusCard]);
 
   async function verifyBonusCard() {
-    const visiblePhone = syncVisiblePhone();
+    const visiblePhone = syncPhoneStateFromDom();
     const requestPhone = normalizeCheckoutPhone(visiblePhone);
     if (!requestPhone || !pinReady || bonusLoading || bonusVerifyAbortRef.current) return;
 
@@ -886,7 +887,7 @@ const isScheduledTimeInFuture =
       if (!response.ok || data?.ok !== true || !Number.isFinite(availableBalance) || availableBalance < 0) {
         throw new Error("invalid bonus response");
       }
-      if (bonusVerifySeqRef.current !== requestId || normalizedBonusPhoneRef.current !== requestPhone) return;
+      if (bonusVerifySeqRef.current !== requestId || normalizeCheckoutPhone(readVisiblePhone()) !== requestPhone) return;
 
       const safeBalance = Math.floor(availableBalance);
       const initialAmount = Math.min(safeBalance, Math.floor(cartTotal * BONUS_MAX_REDEEM_PERCENT / 100));
@@ -894,7 +895,7 @@ const isScheduledTimeInFuture =
       setVerifiedBonusPhone(requestPhone);
       setBonusAmount(String(initialAmount));
     } catch {
-      if (bonusVerifySeqRef.current !== requestId || normalizedBonusPhoneRef.current !== requestPhone) return;
+      if (bonusVerifySeqRef.current !== requestId || normalizeCheckoutPhone(readVisiblePhone()) !== requestPhone) return;
       clearBonusAuthorization(true);
       setBonusError(BONUS_LOOKUP_ERROR);
     } finally {
@@ -931,9 +932,12 @@ const isScheduledTimeInFuture =
   }
 
   async function submitOrder() {
-    const visiblePhone = syncVisiblePhone();
+    const visiblePhone = syncPhoneStateFromDom();
     const visibleNormalizedBonusPhone = normalizeCheckoutPhone(visiblePhone);
-    if (visiblePhone.trim().replace(/\D/g, "").length < 10) return;
+    if (visiblePhone.trim().replace(/\D/g, "").length < 10) {
+      setResult({ ok: false, text: "Введите корректный номер телефона" });
+      return;
+    }
     // Имя обязательно всегда; адрес обязателен только для доставки.
     if (cartEntries.length === 0) return;
     if (!customerName.trim()) return;
@@ -1044,7 +1048,7 @@ window.history.replaceState(null, '', _u.toString());
         setCart({});
         setShowCart(false);
         setAddress("");
-        setPhone("");
+        setPhoneProgrammatically("");
         setComment("");
         setDeliveryMode(isWorkingHours ? "ASAP" : "SCHEDULED");
         setDeliveryTime("");
@@ -2192,10 +2196,10 @@ window.history.replaceState(null, '', _u.toString());
                   ref={phoneInputRef}
                   style={S.input}
                   placeholder="Впишите сюда номер телефона"
-                  value={phone}
-                  onChange={syncPhoneFromEvent}
-                  onInput={syncPhoneFromEvent}
-                  onBlur={syncPhoneFromEvent}
+                  defaultValue={phone}
+                  onChange={syncPhoneStateFromDom}
+                  onInput={syncPhoneStateFromDom}
+                  onBlur={syncPhoneStateFromDom}
                   type="tel"
                   name="phone"
                   inputMode="tel"
@@ -2211,7 +2215,7 @@ window.history.replaceState(null, '', _u.toString());
                           checked={useBonusChecked}
                           onChange={e => {
                             if (e.target.checked) {
-                              syncVisiblePhone();
+                              syncPhoneStateFromDom();
                               setUseBonusChecked(true);
                               setBonusError(null);
                             } else {
@@ -2410,7 +2414,6 @@ window.history.replaceState(null, '', _u.toString());
                     customerName.trim().length === 0 ||
                     (isPickup && !pickupEnabled) ||
                     (!isPickup && address.trim().length < 4) ||
-                    phone.trim().replace(/\D/g, "").length < 10 ||
                     cartEntries.length === 0 ||
                     (!isWorkingHours && deliveryMode === "ASAP") ||
                     (deliveryMode === "SCHEDULED" && !isScheduledTimeValid) ||
@@ -2424,7 +2427,6 @@ window.history.replaceState(null, '', _u.toString());
                     customerName.trim().length === 0 ||
                     (isPickup && !pickupEnabled) ||
                     (!isPickup && address.trim().length < 4) ||
-                    phone.trim().replace(/\D/g, "").length < 10 ||
                     cartEntries.length === 0 ||
                     (!isWorkingHours && deliveryMode === "ASAP") ||
                     (deliveryMode === "SCHEDULED" && !isScheduledTimeValid) ||
