@@ -420,6 +420,7 @@ function App() {
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [bonusCard, setBonusCard] = useState<{ available_balance: number } | null>(null);
   const [bonusLoading, setBonusLoading] = useState(false);
+  const [bonusLookupOpen, setBonusLookupOpen] = useState(false);
   const [useBonusChecked, setUseBonusChecked] = useState(false);
   const [bonusPin, setBonusPin] = useState("");
   const [bonusAmount, setBonusAmount] = useState("");
@@ -830,7 +831,7 @@ const isScheduledTimeInFuture =
 
   const IMAGE_POS: Record<string, string> = { o1: "center 70%", k3: "center 35%", p1: "center 30%" };
 
-  const clearBonusAuthorization = useCallback((disableOptIn = true) => {
+  const clearBonusAuthorization = useCallback((closeLookup = true) => {
     bonusVerifySeqRef.current += 1;
     bonusVerifyAbortRef.current?.abort();
     bonusVerifyAbortRef.current = null;
@@ -839,7 +840,8 @@ const isScheduledTimeInFuture =
     setVerifiedBonusPhone(null);
     setBonusPin("");
     setBonusAmount("");
-    if (disableOptIn) setUseBonusChecked(false);
+    setUseBonusChecked(false);
+    if (closeLookup) setBonusLookupOpen(false);
   }, []);
 
   useLayoutEffect(() => {
@@ -856,7 +858,14 @@ const isScheduledTimeInFuture =
 
   useEffect(() => {
     if (!bonusCard) return;
-    setBonusAmount(prev => String(Math.min(Math.max(0, Math.floor(Number(prev) || 0)), maxBonus)));
+    if (maxBonus <= 0) {
+      setUseBonusChecked(false);
+      setBonusAmount("");
+      return;
+    }
+    setBonusAmount(prev => prev === ""
+      ? ""
+      : String(Math.min(Math.max(0, Math.floor(Number(prev) || 0)), maxBonus)));
   }, [maxBonus, bonusCard]);
 
   async function verifyBonusCard() {
@@ -874,6 +883,7 @@ const isScheduledTimeInFuture =
     setBonusError(null);
     setBonusCard(null);
     setVerifiedBonusPhone(null);
+    setUseBonusChecked(false);
     setBonusAmount("");
 
     try {
@@ -891,13 +901,12 @@ const isScheduledTimeInFuture =
       if (bonusVerifySeqRef.current !== requestId || normalizeCheckoutPhone(readVisiblePhone()) !== requestPhone) return;
 
       const safeBalance = Math.floor(availableBalance);
-      const initialAmount = Math.min(safeBalance, Math.floor(cartTotal * BONUS_MAX_REDEEM_PERCENT / 100));
       setBonusCard({ available_balance: safeBalance });
       setVerifiedBonusPhone(requestPhone);
-      setBonusAmount(String(initialAmount));
+      setBonusAmount("");
     } catch {
       if (bonusVerifySeqRef.current !== requestId || normalizeCheckoutPhone(readVisiblePhone()) !== requestPhone) return;
-      clearBonusAuthorization(true);
+      clearBonusAuthorization(false);
       setBonusError(BONUS_LOOKUP_ERROR);
     } finally {
       window.clearTimeout(timeoutId);
@@ -1018,7 +1027,7 @@ const isScheduledTimeInFuture =
       if (!resp.ok) {
         const detail = data?.detail || `Ошибка: ${JSON.stringify(data)}`;
         if (attemptedBonusUse > 0) {
-          clearBonusAuthorization(true);
+          clearBonusAuthorization(false);
           setBonusError(null);
           setResult({
             ok: false,
@@ -2210,25 +2219,19 @@ window.history.replaceState(null, '', _u.toString());
                 {(() => {
                   return (
                     <div style={{ margin: "6px 0 10px", padding: "10px 12px", background: tgVar("secondary-bg-color", "#f5f0eb"), borderRadius: 10, fontSize: 13 }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: useBonusChecked || bonusError ? 8 : 0 }}>
-                        <input
-                          type="checkbox"
-                          checked={useBonusChecked}
-                          onChange={e => {
-                            if (e.target.checked) {
-                              syncPhoneStateFromDom();
-                              setUseBonusChecked(true);
-                              setBonusError(null);
-                            } else {
-                              clearBonusAuthorization(true);
-                              setBonusError(null);
-                            }
+                      {!bonusLookupOpen ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            syncPhoneStateFromDom();
+                            setBonusLookupOpen(true);
+                            setBonusError(null);
                           }}
-                        />
-                        Использовать бонусные рубли
-                      </label>
-
-                      {useBonusChecked && !bonusVerified && (
+                          style={{ ...S.addBtn, width: "100%" }}
+                        >
+                          Проверить баланс бонусов
+                        </button>
+                      ) : !bonusVerified ? (
                         <div>
                           <input
                             style={{ ...S.input, marginTop: 2 }}
@@ -2245,17 +2248,34 @@ window.history.replaceState(null, '', _u.toString());
                             disabled={!normalizedBonusPhone || !pinReady || bonusLoading}
                             style={{ ...S.addBtn, width: "100%", marginTop: 6, opacity: (!normalizedBonusPhone || !pinReady || bonusLoading) ? 0.55 : 1 }}
                           >
-                            {bonusLoading ? "Проверяем..." : "Проверить бонусы"}
+                            {bonusLoading ? "Проверяем..." : "Показать баланс"}
                           </button>
                         </div>
-                      )}
-
-                      {useBonusChecked && bonusVerified && bonusCard && (
+                      ) : bonusCard ? (
                         <div>
                           <div style={{ marginBottom: 6 }}>
                             💳 Доступно: <strong>{bonusCard.available_balance}</strong> {bonusRubWord(bonusCard.available_balance)}
                           </div>
-                          {maxBonus > 0 ? (
+                          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: maxBonus > 0 ? "pointer" : "not-allowed", marginBottom: 8, opacity: maxBonus > 0 ? 1 : 0.55 }}>
+                            <input
+                              type="checkbox"
+                              checked={useBonusChecked}
+                              disabled={maxBonus <= 0}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  const currentPhone = normalizeCheckoutPhone(syncPhoneStateFromDom());
+                                  if (currentPhone !== verifiedBonusPhone) return;
+                                  setUseBonusChecked(true);
+                                  setBonusAmount(String(maxBonus));
+                                } else {
+                                  setUseBonusChecked(false);
+                                  setBonusAmount("");
+                                }
+                              }}
+                            />
+                            Списать бонусы в этом заказе
+                          </label>
+                          {useBonusChecked && maxBonus > 0 ? (
                             <>
                               <label style={{ display: "block", marginBottom: 4 }}>
                                 Списать бонусных рублей (до {maxBonus})
@@ -2269,17 +2289,17 @@ window.history.replaceState(null, '', _u.toString());
                                 value={bonusAmount}
                                 onChange={e => setBonusAmount(e.target.value.replace(/\D/g, ""))}
                               />
+                              <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>
+                                При списании бонусных рублей новых начислений за этот заказ не будет.
+                              </div>
                             </>
                           ) : bonusCard.available_balance <= 0 ? (
                             <div style={{ opacity: 0.6 }}>На карте пока нет бонусных рублей для списания.</div>
-                          ) : (
+                          ) : maxBonus <= 0 ? (
                             <div style={{ opacity: 0.6 }}>Списание недоступно для этой суммы заказа.</div>
-                          )}
-                          <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>
-                            При списании бонусных рублей новых начислений за этот заказ не будет.
-                          </div>
+                          ) : null}
                         </div>
-                      )}
+                      ) : null}
 
                       {bonusError && (
                         <div style={{ fontSize: 12, color: "#9b2c2c", lineHeight: 1.4 }}>
@@ -2287,7 +2307,7 @@ window.history.replaceState(null, '', _u.toString());
                         </div>
                       )}
 
-                      {!useBonusChecked && !bonusError && (
+                      {!useBonusChecked && (
                         <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>
                           {cartTotal >= BONUS_MIN_ORDER_TOTAL ? (
                             <>🎁 После выполнения заказа начислим <strong>{expectedBonusEarn}</strong> {bonusRubWord(expectedBonusEarn)}. Если карты ещё нет — создадим её автоматически.</>
